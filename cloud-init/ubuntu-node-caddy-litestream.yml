@@ -146,6 +146,7 @@ write_files:
   - path: /etc/litestream/env
     permissions: "0640"
     owner: root:litestream
+    defer: true
     content: |
       AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
@@ -201,7 +202,7 @@ write_files:
 
 runcmd:
   - install -d -o deploy -g app -m 0750 /opt/app
-  - install -d -o app -g app -m 0750 /var/lib/app
+  - install -d -o app -g app -m 0770 /var/lib/app
   - install -d -o app -g app -m 0750 /var/log/app
 
   - sqlite3 /var/lib/app/app.sqlite "PRAGMA journal_mode=WAL;"

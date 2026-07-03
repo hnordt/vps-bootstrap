@@ -121,7 +121,7 @@ write_files:
       User=litestream
       Group=litestream
       SupplementaryGroups=app
-      ExecStartPre=/usr/local/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db
+      ExecStartPre=+/bin/sh -c '/usr/local/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db; if [ -e /var/lib/app/data.db ]; then chown app:app /var/lib/app/data.db*; chmod 0660 /var/lib/app/data.db*; fi'
       ExecStart=/usr/local/bin/litestream replicate -config /etc/litestream.yml
       Restart=always
       RestartSec=5
@@ -195,8 +195,8 @@ write_files:
       curl -fsS https://www.cloudflare.com/ips-v4 -o "$tmp/ips-v4"
       curl -fsS https://www.cloudflare.com/ips-v6 -o "$tmp/ips-v6"
 
-      grep -Eq '^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$' "$tmp/ips-v4"
-      grep -Eq '^[0-9a-fA-F:]+/[0-9]{1,3}$' "$tmp/ips-v6"
+      awk 'NF { valid=1; if ($0 !~ /^[0-9]{1,3}(\.[0-9]{1,3}){3}\/[0-9]{1,2}$/) bad=1 } END { exit (valid && !bad) ? 0 : 1 }' "$tmp/ips-v4"
+      awk 'NF { valid=1; if ($0 !~ /^[0-9a-fA-F:]+\/[0-9]{1,3}$/) bad=1 } END { exit (valid && !bad) ? 0 : 1 }' "$tmp/ips-v6"
 
       while ufw status numbered | grep -q "Cloudflare"; do
         n="$(ufw status numbered | grep "Cloudflare" | head -n1 | sed -E 's/^\[ *([0-9]+)\].*/\1/')"
@@ -204,10 +204,12 @@ write_files:
       done
 
       while read -r ip; do
+        [ -n "$ip" ] || continue
         ufw allow proto tcp from "$ip" to any port 443 comment "Cloudflare"
       done < "$tmp/ips-v4"
 
       while read -r ip; do
+        [ -n "$ip" ] || continue
         ufw allow proto tcp from "$ip" to any port 443 comment "Cloudflare"
       done < "$tmp/ips-v6"
 
