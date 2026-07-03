@@ -67,8 +67,8 @@ write_files:
     content: |
       [Unit]
       Description=Node application
-      After=network-online.target
-      Wants=network-online.target
+      Wants=network-online.target litestream.service
+      After=network-online.target litestream.service
 
       [Service]
       Type=simple
@@ -78,9 +78,59 @@ write_files:
       Environment=NODE_ENV=production
       Environment=HOST=127.0.0.1
       Environment=PORT=3000
+      Environment=DATABASE_URL=/var/lib/app/app.sqlite
       ExecStart=/usr/bin/node /opt/app/server.js
       Restart=always
       RestartSec=3
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectHome=true
+      ProtectSystem=strict
+      ReadWritePaths=/var/lib/app /var/log/app
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/litestream.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      dbs:
+        - path: /var/lib/app/app.sqlite
+          replicas:
+            - url: s3://YOUR_BUCKET_NAME/app.sqlite
+              endpoint: https://YOUR_OBJECT_STORAGE_ENDPOINT
+              region: us-east-1
+
+  - path: /etc/litestream/env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
+      AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
+
+  - path: /etc/systemd/system/litestream.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Litestream SQLite replication
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=app
+      Group=app
+      EnvironmentFile=/etc/litestream/env
+      ExecStart=/usr/local/bin/litestream replicate -config /etc/litestream.yml
+      Restart=always
+      RestartSec=5
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectHome=true
+      ProtectSystem=strict
+      ReadWritePaths=/var/lib/app /var/log/app
 
       [Install]
       WantedBy=multi-user.target
@@ -126,6 +176,26 @@ runcmd:
     apt-get update
     apt-get install -y caddy
 
+  - |
+    ARCH="$(dpkg --print-architecture)"
+    case "$ARCH" in
+      amd64) LITESTREAM_ARCH="amd64" ;;
+      arm64) LITESTREAM_ARCH="arm64" ;;
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+    esac
+
+    LITESTREAM_URL="$(
+      curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest \
+        | jq -r ".assets[] | select(.name | test(\"linux-${LITESTREAM_ARCH}.*tar.gz$\")) | .browser_download_url" \
+        | head -n 1
+    )"
+
+    test -n "$LITESTREAM_URL"
+    curl -fsSL "$LITESTREAM_URL" -o /tmp/litestream.tar.gz
+    tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
+    chmod 0755 /usr/local/bin/litestream
+    rm -f /tmp/litestream.tar.gz
+
   - ufw default deny incoming
   - ufw default allow outgoing
   - ufw limit 22/tcp comment "SSH"
@@ -134,6 +204,8 @@ runcmd:
 
   - dpkg-reconfigure -f noninteractive unattended-upgrades
   - systemctl daemon-reload
+  - systemctl enable litestream
+  - systemctl restart litestream
   - systemctl enable app
   - systemctl restart app
   - systemctl enable caddy
