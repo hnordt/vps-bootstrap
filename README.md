@@ -239,7 +239,3 @@ Operations:
 - [ ] Disk usage is monitored.
 - [ ] `/health` is monitored.
 - [ ] Logs are retained but bounded.
-
-## License
-
-MIT
