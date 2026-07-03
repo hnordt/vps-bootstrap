@@ -113,8 +113,8 @@ write_files:
       Type=simple
       User=app
       Group=app
-      ExecStartPre=/usr/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db
-      ExecStart=/usr/bin/litestream replicate -config /etc/litestream.yml
+      ExecStartPre=/usr/local/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db
+      ExecStart=/usr/local/bin/litestream replicate -config /etc/litestream.yml
       Restart=always
       RestartSec=5
       NoNewPrivileges=true
@@ -203,8 +203,6 @@ write_files:
 runcmd:
   - install -d -o app -g app -m 0750 /var/lib/app/current
   - install -d -o root -g root -m 0750 /etc/caddy/certs
-  - sqlite3 /var/lib/app/data.db "PRAGMA journal_mode=WAL;"
-  - chown app:app /var/lib/app/data.db*
 
   - |
     NODE_MAJOR=22
@@ -231,3 +229,42 @@ runcmd:
   - chown -R root:caddy /etc/caddy/certs
   - chmod 0750 /etc/caddy/certs
   - chmod 0640 /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+
+  - |
+    ARCH="$(dpkg --print-architecture)"
+    case "$ARCH" in
+      amd64) LITESTREAM_ARCH="amd64" ;;
+      arm64) LITESTREAM_ARCH="arm64" ;;
+      *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+    esac
+
+    LITESTREAM_URL="$(
+      curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest \
+        | jq -r ".assets[] | select(.name | test(\"linux-${LITESTREAM_ARCH}.*tar.gz$\")) | .browser_download_url" \
+        | head -n 1
+    )"
+
+    test -n "$LITESTREAM_URL"
+    curl -fsSL "$LITESTREAM_URL" -o /tmp/litestream.tar.gz
+    tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
+    chmod 0755 /usr/local/bin/litestream
+
+  - cp /opt/bootstrap/litestream.yml /etc/litestream.yml
+  - chown root:app /etc/litestream.yml
+  - chmod 0640 /etc/litestream.yml
+
+  - sudo -u app /usr/local/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db || true
+  - test -f /var/lib/app/data.db || sudo -u app sqlite3 /var/lib/app/data.db "PRAGMA journal_mode=WAL;"
+
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw limit 22/tcp comment "SSH"
+  - /usr/local/bin/cf-ufw-sync
+  - ufw --force enable
+
+  - systemctl daemon-reload
+  - systemctl enable --now cf-ufw-sync.timer
+  - systemctl enable --now fail2ban
+  - systemctl enable --now litestream
+  - systemctl enable app
+  - systemctl enable --now caddy
