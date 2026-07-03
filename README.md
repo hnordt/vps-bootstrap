@@ -1,11 +1,12 @@
 # VPS Bootstrap
 
-Cloud-init templates and setup files for running small production-oriented Node.js servers on VPS providers.
+Cloud-init setup for running a small production-oriented Node.js server on a VPS provider behind Cloudflare.
 
-The default templates target Ubuntu LTS and include:
+The default setup targets Ubuntu LTS and includes:
 
 - Node.js
-- Caddy as the public HTTPS reverse proxy
+- Cloudflare as the public edge
+- Caddy as the origin HTTPS reverse proxy
 - systemd services for the application and Litestream
 - SQLite with WAL mode
 - UFW firewall rules
@@ -18,31 +19,23 @@ The default templates target Ubuntu LTS and include:
 This repository provides a predictable baseline for a small VPS.
 
 ```txt
-internet -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
+browser -> Cloudflare edge -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
 ```
 
-The application should listen on `127.0.0.1`. Caddy should be the only public HTTP entrypoint.
+The application should listen on `127.0.0.1`. Cloudflare should be the public HTTP entrypoint, and Caddy should only accept HTTPS from Cloudflare IP ranges.
 
-## Templates
+## Template
 
 ```txt
-cloud-init/ubuntu-node-caddy-litestream.yml
+cloud-init.yml
 ```
 
-Generic template. Caddy obtains public TLS certificates directly.
-
-```txt
-cloud-init/ubuntu-node-caddy-cloudflare-litestream.yml
-```
-
-Cloudflare-origin template. Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (strict), and UFW allows port 443 only from Cloudflare IP ranges.
+Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (strict), and UFW allows port 443 only from Cloudflare IP ranges.
 
 ## Repository structure
 
 ```txt
-cloud-init/
-  ubuntu-node-caddy-litestream.yml
-  ubuntu-node-caddy-cloudflare-litestream.yml
+cloud-init.yml
 docs/
   vultr.md
   cloudflare-origin.md
@@ -51,15 +44,15 @@ docs/
   litestream-version.md
 ```
 
-The cloud-init templates are the source of truth for the generated systemd units and Caddy configuration.
+The cloud-init file is the source of truth for the generated systemd units and Caddy configuration.
 
 ## Quick start
 
-1. Choose one template from `cloud-init/`.
-2. Replace every placeholder value.
-3. Replace the Litestream SHA256 placeholders for the architecture you will deploy.
-4. Point your domain to the VPS.
-5. Create an Ubuntu LTS VPS and paste the file as user data.
+1. Replace every placeholder value in `cloud-init.yml`.
+2. Replace the Litestream SHA256 placeholders for the architecture you will deploy.
+3. Point your proxied Cloudflare DNS record to the VPS.
+4. Set Cloudflare SSL/TLS mode to Full (strict).
+5. Create an Ubuntu LTS VPS and paste `cloud-init.yml` as user data.
 6. Connect as the `deploy` user.
 7. Verify the services.
 

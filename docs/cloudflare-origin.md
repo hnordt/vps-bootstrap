@@ -1,6 +1,6 @@
 # Cloudflare origin setup
 
-Use `cloud-init/ubuntu-node-caddy-cloudflare-litestream.yml` when the domain is proxied through Cloudflare and you do not want the origin exposed directly on public HTTPS.
+Use `cloud-init.yml` when the domain is proxied through Cloudflare and you do not want the origin exposed directly on public HTTPS.
 
 ## Origin traffic model
 
