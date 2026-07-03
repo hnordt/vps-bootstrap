@@ -50,7 +50,7 @@ sudo systemctl status litestream
 curl -I https://app.example.com/health
 ```
 
-Use `cloud-config.yaml` when the domain is proxied through Cloudflare and you do not want the origin exposed directly on public HTTPS.
+This setup expects Cloudflare to be the public entrypoint for your domain. The VPS still serves HTTPS with Caddy, but only Cloudflare IP ranges should be able to reach it.
 
 The VPS firewall allows SSH and allows HTTPS only from Cloudflare IP ranges.
 
