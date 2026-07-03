@@ -60,10 +60,11 @@ docs/
 
 1. Choose one template from `cloud-init/`.
 2. Replace every placeholder value.
-3. Point your domain to the VPS.
-4. Create an Ubuntu LTS VPS and paste the file as user data.
-5. Connect as the `deploy` user.
-6. Verify the services.
+3. Replace the Litestream SHA256 placeholders for the architecture you will deploy.
+4. Point your domain to the VPS.
+5. Create an Ubuntu LTS VPS and paste the file as user data.
+6. Connect as the `deploy` user.
+7. Verify the services.
 
 ```bash
 ssh deploy@YOUR_SERVER_IP
@@ -78,9 +79,16 @@ curl -I https://app.example.com/health
 
 Do not commit real credentials.
 
-For production, prefer uploading secret files after the server boots instead of placing production credentials directly in cloud-init user data.
+Do not place production long-lived secrets directly in cloud-init user data when you can avoid it. User data may be retained by the VPS provider and may be readable from inside the instance through the provider metadata service, not only by `root`.
 
-Cloud-init user data may be retained by the VPS provider and may be readable from the instance by root.
+For production, prefer this flow:
+
+1. Deploy with placeholder or temporary credentials.
+2. Upload final secret files over SSH after the server boots.
+3. Store backup credentials in files readable only by the `litestream` user or group.
+4. Keep the application user unable to read backup credentials.
+5. Use object storage credentials scoped to the one backup bucket or path.
+6. Enable bucket versioning. Use object lock if you need stronger protection against destructive backup deletion.
 
 ## License
 

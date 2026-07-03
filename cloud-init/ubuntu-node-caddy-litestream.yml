@@ -6,6 +6,7 @@ timezone: America/Sao_Paulo
 
 groups:
   - app
+  - litestream
 
 users:
   - name: deploy
@@ -21,6 +22,12 @@ users:
     system: true
     shell: /usr/sbin/nologin
     groups: [app]
+    lock_passwd: true
+
+  - name: litestream
+    system: true
+    shell: /usr/sbin/nologin
+    groups: [app, litestream]
     lock_passwd: true
 
 ssh_pwauth: false
@@ -40,6 +47,7 @@ write_files:
   - path: /opt/app/server.js
     permissions: "0644"
     owner: deploy:app
+    defer: true
     content: |
       const http = require("node:http");
 
@@ -60,6 +68,27 @@ write_files:
       server.listen(port, host, () => {
         console.log(`Server listening on http://${host}:${port}`);
       });
+
+  - path: /etc/fail2ban/jail.d/sshd.local
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [DEFAULT]
+      backend = systemd
+      banaction = ufw
+
+      [sshd]
+      enabled = true
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    owner: root:root
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
 
   - path: /etc/systemd/system/app.service
     permissions: "0644"
@@ -82,11 +111,21 @@ write_files:
       ExecStart=/usr/bin/node /opt/app/server.js
       Restart=always
       RestartSec=3
+      TimeoutStopSec=20
+      KillSignal=SIGTERM
       NoNewPrivileges=true
       PrivateTmp=true
+      PrivateDevices=true
       ProtectHome=true
       ProtectSystem=strict
       ReadWritePaths=/var/lib/app /var/log/app
+      ProtectKernelTunables=true
+      ProtectKernelModules=true
+      ProtectControlGroups=true
+      RestrictRealtime=true
+      RestrictSUIDSGID=true
+      RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+      SystemCallArchitectures=native
 
       [Install]
       WantedBy=multi-user.target
@@ -97,14 +136,17 @@ write_files:
     content: |
       dbs:
         - path: /var/lib/app/app.sqlite
-          replicas:
-            - url: s3://YOUR_BUCKET_NAME/app.sqlite
-              endpoint: https://YOUR_OBJECT_STORAGE_ENDPOINT
-              region: us-east-1
+          replica:
+            type: s3
+            endpoint: https://YOUR_OBJECT_STORAGE_ENDPOINT
+            region: us-east-1
+            bucket: YOUR_BUCKET_NAME
+            path: app.sqlite
 
   - path: /etc/litestream/env
-    permissions: "0600"
-    owner: root:root
+    permissions: "0640"
+    owner: root:litestream
+    defer: true
     content: |
       AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
       AWS_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
@@ -120,17 +162,26 @@ write_files:
 
       [Service]
       Type=simple
-      User=app
-      Group=app
+      User=litestream
+      Group=litestream
+      SupplementaryGroups=app
       EnvironmentFile=/etc/litestream/env
       ExecStart=/usr/local/bin/litestream replicate -config /etc/litestream.yml
       Restart=always
       RestartSec=5
       NoNewPrivileges=true
       PrivateTmp=true
+      PrivateDevices=true
       ProtectHome=true
       ProtectSystem=strict
       ReadWritePaths=/var/lib/app /var/log/app
+      ProtectKernelTunables=true
+      ProtectKernelModules=true
+      ProtectControlGroups=true
+      RestrictRealtime=true
+      RestrictSUIDSGID=true
+      RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+      SystemCallArchitectures=native
 
       [Install]
       WantedBy=multi-user.target
@@ -151,11 +202,12 @@ write_files:
 
 runcmd:
   - install -d -o deploy -g app -m 0750 /opt/app
-  - install -d -o app -g app -m 0750 /var/lib/app
+  - install -d -o app -g app -m 0770 /var/lib/app
   - install -d -o app -g app -m 0750 /var/log/app
 
   - sqlite3 /var/lib/app/app.sqlite "PRAGMA journal_mode=WAL;"
   - chown app:app /var/lib/app/app.sqlite*
+  - chmod 0660 /var/lib/app/app.sqlite*
 
   - |
     NODE_MAJOR=22
@@ -177,21 +229,31 @@ runcmd:
     apt-get install -y caddy
 
   - |
+    LITESTREAM_VERSION="v0.5.13"
+    LITESTREAM_SHA256_AMD64="__LITESTREAM_SHA256_AMD64__"
+    LITESTREAM_SHA256_ARM64="__LITESTREAM_SHA256_ARM64__"
+
     ARCH="$(dpkg --print-architecture)"
     case "$ARCH" in
-      amd64) LITESTREAM_ARCH="amd64" ;;
-      arm64) LITESTREAM_ARCH="arm64" ;;
+      amd64)
+        LITESTREAM_ARCH="amd64"
+        LITESTREAM_SHA256="$LITESTREAM_SHA256_AMD64"
+        ;;
+      arm64)
+        LITESTREAM_ARCH="arm64"
+        LITESTREAM_SHA256="$LITESTREAM_SHA256_ARM64"
+        ;;
       *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
     esac
 
-    LITESTREAM_URL="$(
-      curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest \
-        | jq -r ".assets[] | select(.name | test(\"linux-${LITESTREAM_ARCH}.*tar.gz$\")) | .browser_download_url" \
-        | head -n 1
-    )"
+    case "$LITESTREAM_SHA256" in
+      __LITESTREAM_SHA256_*) echo "Replace Litestream SHA256 placeholders before deploying." && exit 1 ;;
+    esac
 
-    test -n "$LITESTREAM_URL"
+    LITESTREAM_URL="https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION#v}-linux-${LITESTREAM_ARCH}.tar.gz"
+
     curl -fsSL "$LITESTREAM_URL" -o /tmp/litestream.tar.gz
+    echo "${LITESTREAM_SHA256}  /tmp/litestream.tar.gz" | sha256sum -c -
     tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
     chmod 0755 /usr/local/bin/litestream
     rm -f /tmp/litestream.tar.gz
