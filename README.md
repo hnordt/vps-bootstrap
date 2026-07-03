@@ -2,7 +2,7 @@
 
 Cloud-init setup for running a small production-oriented Node.js server on a VPS provider behind Cloudflare.
 
-The default setup targets Ubuntu LTS and includes:
+The default setup targets Ubuntu 24.04 LTS and includes:
 
 - Node.js
 - Cloudflare as the public edge
@@ -24,20 +24,6 @@ browser -> Cloudflare edge -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLi
 
 The application should listen on `127.0.0.1`. Cloudflare should be the public HTTP entrypoint, and Caddy should only accept HTTPS from Cloudflare IP ranges.
 
-## Template
-
-```txt
-cloud-config.yaml
-```
-
-Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (strict), and UFW allows port 443 only from Cloudflare IP ranges.
-
-## Repository structure
-
-```txt
-cloud-config.yaml
-```
-
 The cloud-config file is the source of truth for the generated systemd units and Caddy configuration.
 
 ## Quick start
@@ -46,7 +32,7 @@ The cloud-config file is the source of truth for the generated systemd units and
 2. Replace the Litestream SHA256 placeholders for the architecture you will deploy.
 3. Point your proxied Cloudflare DNS record to the VPS.
 4. Set Cloudflare SSL/TLS mode to Full (strict).
-5. Create an Ubuntu LTS VPS and paste `cloud-config.yaml` as user data.
+5. Create an Ubuntu 24.04 LTS VPS and paste `cloud-config.yaml` as user data.
 6. Connect as the `deploy` user.
 7. Verify the services.
 
@@ -99,7 +85,7 @@ __LITESTREAM_SHA256_ARM64__
 
 ## Vultr Setup
 
-1. Choose an Ubuntu LTS image.
+1. Choose an Ubuntu 24.04 LTS image.
 2. Choose a region close to your users.
 3. Add your SSH key in Vultr.
 4. Paste `cloud-config.yaml` into the user data field.
