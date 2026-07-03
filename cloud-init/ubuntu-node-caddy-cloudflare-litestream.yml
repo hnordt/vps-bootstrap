@@ -99,3 +99,59 @@ write_files:
             path: data.db
             access-key-id: __S3_ACCESS_KEY_ID__
             secret-access-key: __S3_SECRET_ACCESS_KEY__
+
+  - path: /etc/systemd/system/litestream.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Litestream SQLite replication
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=app
+      Group=app
+      ExecStartPre=/usr/bin/litestream restore -config /etc/litestream.yml -if-db-not-exists -if-replica-exists /var/lib/app/data.db
+      ExecStart=/usr/bin/litestream replicate -config /etc/litestream.yml
+      Restart=always
+      RestartSec=5
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectHome=true
+      ProtectSystem=strict
+      ReadWritePaths=/var/lib/app
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/app.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Node app
+      After=network-online.target litestream.service
+      Wants=network-online.target litestream.service
+
+      [Service]
+      Type=simple
+      User=app
+      Group=app
+      WorkingDirectory=/var/lib/app/current
+      ExecStart=/usr/bin/node /var/lib/app/current/server.js
+      Environment=NODE_ENV=production
+      Environment=HOST=127.0.0.1
+      Environment=PORT=3000
+      Environment=DATABASE_URL=/var/lib/app/data.db
+      Restart=on-failure
+      RestartSec=5
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ReadWritePaths=/var/lib/app
+
+      [Install]
+      WantedBy=multi-user.target
