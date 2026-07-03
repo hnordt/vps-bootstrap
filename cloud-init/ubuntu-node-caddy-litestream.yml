@@ -1,0 +1,28 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+timezone: America/Sao_Paulo
+
+users:
+  - name: deploy
+    gecos: Deploy User
+    shell: /bin/bash
+    groups: [sudo]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - YOUR_SSH_PUBLIC_KEY
+
+ssh_pwauth: false
+disable_root: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - jq
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - sqlite3
