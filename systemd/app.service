@@ -23,6 +23,7 @@ KillSignal=SIGTERM
 
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/app /var/log/app
@@ -32,6 +33,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 SystemCallArchitectures=native
 
 [Install]
