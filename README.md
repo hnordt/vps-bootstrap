@@ -43,11 +43,6 @@ Cloudflare-origin template. Caddy uses a Cloudflare Origin Certificate, Cloudfla
 cloud-init/
   ubuntu-node-caddy-litestream.yml
   ubuntu-node-caddy-cloudflare-litestream.yml
-systemd/
-  app.service
-  litestream.service
-caddy/
-  Caddyfile
 docs/
   vultr.md
   cloudflare-origin.md
@@ -55,6 +50,8 @@ docs/
   litestream-restore.md
   litestream-version.md
 ```
+
+The cloud-init templates are the source of truth for the generated systemd units and Caddy configuration.
 
 ## Quick start
 
