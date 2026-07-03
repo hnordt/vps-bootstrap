@@ -2,7 +2,7 @@
 
 Cloud-init templates and setup files for running small production-oriented Node.js servers on VPS providers.
 
-The default template targets Ubuntu LTS and includes:
+The default templates target Ubuntu LTS and include:
 
 - Node.js
 - Caddy as the public HTTPS reverse proxy
@@ -23,11 +23,26 @@ internet -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
 
 The application should listen on `127.0.0.1`. Caddy should be the only public HTTP entrypoint.
 
+## Templates
+
+```txt
+cloud-init/ubuntu-node-caddy-litestream.yml
+```
+
+Generic template. Caddy obtains public TLS certificates directly.
+
+```txt
+cloud-init/ubuntu-node-caddy-cloudflare-litestream.yml
+```
+
+Cloudflare-origin template. Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (strict), and UFW allows port 443 only from Cloudflare IP ranges.
+
 ## Repository structure
 
 ```txt
 cloud-init/
   ubuntu-node-caddy-litestream.yml
+  ubuntu-node-caddy-cloudflare-litestream.yml
 systemd/
   app.service
   litestream.service
@@ -35,13 +50,15 @@ caddy/
   Caddyfile
 docs/
   vultr.md
+  cloudflare-origin.md
   security-checklist.md
   litestream-restore.md
+  litestream-version.md
 ```
 
 ## Quick start
 
-1. Copy `cloud-init/ubuntu-node-caddy-litestream.yml`.
+1. Choose one template from `cloud-init/`.
 2. Replace every placeholder value.
 3. Point your domain to the VPS.
 4. Create an Ubuntu LTS VPS and paste the file as user data.
@@ -61,7 +78,9 @@ curl -I https://app.example.com/health
 
 Do not commit real credentials.
 
-For production, prefer uploading `/etc/litestream/env` after the server boots instead of placing production credentials directly in cloud-init user data.
+For production, prefer uploading secret files after the server boots instead of placing production credentials directly in cloud-init user data.
+
+Cloud-init user data may be retained by the VPS provider and may be readable from the instance by root.
 
 ## License
 
