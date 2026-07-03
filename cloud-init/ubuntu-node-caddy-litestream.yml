@@ -98,3 +98,45 @@ write_files:
         encode zstd gzip
         reverse_proxy 127.0.0.1:3000
       }
+
+runcmd:
+  - install -d -o deploy -g app -m 0750 /opt/app
+  - install -d -o app -g app -m 0750 /var/lib/app
+  - install -d -o app -g app -m 0750 /var/log/app
+
+  - sqlite3 /var/lib/app/app.sqlite "PRAGMA journal_mode=WAL;"
+  - chown app:app /var/lib/app/app.sqlite*
+
+  - |
+    NODE_MAJOR=22
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
+      > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install -y nodejs
+
+  - |
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
+      > /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update
+    apt-get install -y caddy
+
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw limit 22/tcp comment "SSH"
+  - ufw allow 443/tcp comment "HTTPS"
+  - ufw --force enable
+
+  - dpkg-reconfigure -f noninteractive unattended-upgrades
+  - systemctl daemon-reload
+  - systemctl enable app
+  - systemctl restart app
+  - systemctl enable caddy
+  - systemctl restart caddy
+  - systemctl enable fail2ban
+  - systemctl restart fail2ban
