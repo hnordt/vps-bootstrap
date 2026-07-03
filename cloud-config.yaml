@@ -1,4 +1,5 @@
 #cloud-config
+
 # Target: Ubuntu 24.04 LTS on a VPS provider.
 # Replace every __PLACEHOLDER__ before deploying.
 
