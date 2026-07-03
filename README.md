@@ -28,13 +28,13 @@ The cloud-config file is the source of truth for the generated systemd units and
 
 ## Deployment Setup
 
-Use `cloud-config.yaml` with any VPS provider that supports cloud-init user data, such as Vultr, DigitalOcean, Hetzner, Linode, AWS Lightsail, or another Ubuntu VPS host. Provider field names vary; use the field that accepts `#cloud-config` user data, not a shell-only startup script.
+Use `cloud-config.yaml` with any VPS provider that supports cloud-init user data, such as Vultr, DigitalOcean, Hetzner, Linode, AWS Lightsail, or another Ubuntu VPS host.
 
 1. Choose an Ubuntu 24.04 LTS image.
 2. Choose a region close to your users.
 3. Create a Cloudflare Origin Certificate for the app hostname you will use as `__DOMAIN__`.
 4. Replace every placeholder value in `cloud-config.yaml`, including the SSH public key, Cloudflare certificate, object storage settings, and Litestream checksums.
-5. Create the VPS and paste `cloud-config.yaml` into the provider's cloud-init or user data field.
+5. Create the VPS and paste the full contents of `cloud-config.yaml`, starting with `#cloud-config`, into the provider's cloud-init or user data field.
 6. Copy the VPS public IPv4 address from the provider console.
 7. In Cloudflare, create a proxied `A` record for `__DOMAIN__` pointing to the VPS public IPv4 address.
 8. Set Cloudflare SSL/TLS mode to `Full (strict)`.
