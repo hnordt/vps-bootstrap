@@ -155,3 +155,79 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+
+  - path: /usr/local/bin/cf-ufw-sync
+    permissions: "0755"
+    owner: root:root
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      while ufw status numbered | grep -q "Cloudflare"; do
+        n="$(ufw status numbered | grep "Cloudflare" | head -n1 | sed -E 's/^\[ *([0-9]+)\].*/\1/')"
+        ufw --force delete "$n"
+      done
+
+      for ip in $(curl -fsS https://www.cloudflare.com/ips-v4) \
+                $(curl -fsS https://www.cloudflare.com/ips-v6); do
+        ufw allow proto tcp from "$ip" to any port 443 comment "Cloudflare"
+      done
+
+  - path: /etc/systemd/system/cf-ufw-sync.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Sync UFW allowlist with Cloudflare IP ranges
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/cf-ufw-sync
+
+  - path: /etc/systemd/system/cf-ufw-sync.timer
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Weekly Cloudflare IP range sync
+
+      [Timer]
+      OnCalendar=weekly
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - install -d -o app -g app -m 0750 /var/lib/app/current
+  - install -d -o root -g root -m 0750 /etc/caddy/certs
+  - sqlite3 /var/lib/app/data.db "PRAGMA journal_mode=WAL;"
+  - chown app:app /var/lib/app/data.db*
+
+  - |
+    NODE_MAJOR=22
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
+      > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install -y nodejs
+
+  - |
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/caddy-stable-archive-keyring.gpg
+    curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
+      > /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update
+    apt-get install -y caddy
+
+  - cp /opt/bootstrap/origin.pem /etc/caddy/certs/origin.pem
+  - cp /opt/bootstrap/origin.key /etc/caddy/certs/origin.key
+  - cp /opt/bootstrap/Caddyfile /etc/caddy/Caddyfile
+  - chown -R root:caddy /etc/caddy/certs
+  - chmod 0750 /etc/caddy/certs
+  - chmod 0640 /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
