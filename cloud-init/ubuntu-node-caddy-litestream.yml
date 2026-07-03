@@ -4,15 +4,24 @@ package_update: true
 package_upgrade: true
 timezone: America/Sao_Paulo
 
+groups:
+  - app
+
 users:
   - name: deploy
     gecos: Deploy User
     shell: /bin/bash
-    groups: [sudo]
+    groups: [sudo, app]
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     lock_passwd: true
     ssh_authorized_keys:
       - YOUR_SSH_PUBLIC_KEY
+
+  - name: app
+    system: true
+    shell: /usr/sbin/nologin
+    groups: [app]
+    lock_passwd: true
 
 ssh_pwauth: false
 disable_root: true
@@ -26,3 +35,66 @@ packages:
   - fail2ban
   - unattended-upgrades
   - sqlite3
+
+write_files:
+  - path: /opt/app/server.js
+    permissions: "0644"
+    owner: deploy:app
+    content: |
+      const http = require("node:http");
+
+      const host = process.env.HOST ?? "127.0.0.1";
+      const port = Number(process.env.PORT ?? 3000);
+
+      const server = http.createServer((req, res) => {
+        if (req.url === "/health") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end("OK\n");
+      });
+
+      server.listen(port, host, () => {
+        console.log(`Server listening on http://${host}:${port}`);
+      });
+
+  - path: /etc/systemd/system/app.service
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Node application
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=app
+      Group=app
+      WorkingDirectory=/opt/app
+      Environment=NODE_ENV=production
+      Environment=HOST=127.0.0.1
+      Environment=PORT=3000
+      ExecStart=/usr/bin/node /opt/app/server.js
+      Restart=always
+      RestartSec=3
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/caddy/Caddyfile
+    permissions: "0644"
+    owner: root:root
+    content: |
+      {
+        email admin@example.com
+        admin off
+      }
+
+      app.example.com {
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:3000
+      }
