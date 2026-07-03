@@ -27,7 +27,7 @@ The application should listen on `127.0.0.1`. Cloudflare should be the public HT
 ## Template
 
 ```txt
-cloud-init.yml
+cloud-config.yaml
 ```
 
 Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (strict), and UFW allows port 443 only from Cloudflare IP ranges.
@@ -35,18 +35,18 @@ Caddy uses a Cloudflare Origin Certificate, Cloudflare should be set to Full (st
 ## Repository structure
 
 ```txt
-cloud-init.yml
+cloud-config.yaml
 ```
 
-The cloud-init file is the source of truth for the generated systemd units and Caddy configuration.
+The cloud-config file is the source of truth for the generated systemd units and Caddy configuration.
 
 ## Quick start
 
-1. Replace every placeholder value in `cloud-init.yml`.
+1. Replace every placeholder value in `cloud-config.yaml`.
 2. Replace the Litestream SHA256 placeholders for the architecture you will deploy.
 3. Point your proxied Cloudflare DNS record to the VPS.
 4. Set Cloudflare SSL/TLS mode to Full (strict).
-5. Create an Ubuntu LTS VPS and paste `cloud-init.yml` as user data.
+5. Create an Ubuntu LTS VPS and paste `cloud-config.yaml` as user data.
 6. Connect as the `deploy` user.
 7. Verify the services.
 
@@ -61,7 +61,7 @@ curl -I https://app.example.com/health
 
 ## Cloudflare Setup
 
-Use `cloud-init.yml` when the domain is proxied through Cloudflare and you do not want the origin exposed directly on public HTTPS.
+Use `cloud-config.yaml` when the domain is proxied through Cloudflare and you do not want the origin exposed directly on public HTTPS.
 
 The VPS firewall allows SSH and allows HTTPS only from Cloudflare IP ranges.
 
@@ -71,7 +71,7 @@ Required Cloudflare settings:
 2. Enable proxying for that record.
 3. Set SSL/TLS mode to `Full (strict)`.
 4. Create an Origin Certificate in Cloudflare.
-5. Paste the certificate and key into the cloud-init placeholders.
+5. Paste the certificate and key into the cloud-config placeholders.
 
 Cloudflare Origin Certificates secure the connection between Cloudflare and the origin server. They are compatible with Full (strict) mode, but they are not browser-trusted certificates if someone bypasses Cloudflare and connects directly to the origin.
 
@@ -102,7 +102,7 @@ __LITESTREAM_SHA256_ARM64__
 1. Choose an Ubuntu LTS image.
 2. Choose a region close to your users.
 3. Add your SSH key in Vultr.
-4. Paste `cloud-init.yml` into the user data field.
+4. Paste `cloud-config.yaml` into the user data field.
 5. Create the instance.
 
 Create a proxied Cloudflare `A` record pointing your app domain to the VPS IPv4 address:
@@ -155,13 +155,13 @@ This makes provisioning deterministic and prevents running a dynamically selecte
 When upgrading Litestream:
 
 1. Choose the new release version.
-2. Update `LITESTREAM_VERSION` in `cloud-init.yml`.
+2. Update `LITESTREAM_VERSION` in `cloud-config.yaml`.
 3. Download the release artifacts for each target architecture.
 4. Compute the SHA256 checksum for each artifact.
 5. Replace the checksum placeholders in the deployed template.
 6. Test restore and replication on a disposable VPS before using the new version in production.
 
-For disposable manual testing, this snippet installs the latest Litestream release for the current architecture. Production provisioning should use the pinned version and SHA256 verification in `cloud-init.yml`.
+For disposable manual testing, this snippet installs the latest Litestream release for the current architecture. Production provisioning should use the pinned version and SHA256 verification in `cloud-config.yaml`.
 
 ```bash
 ARCH="$(dpkg --print-architecture)"
