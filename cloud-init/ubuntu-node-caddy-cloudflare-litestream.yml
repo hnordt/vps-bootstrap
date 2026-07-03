@@ -1,0 +1,101 @@
+#cloud-config
+# Target: Ubuntu 24.04 LTS on a VPS provider.
+# Replace every __PLACEHOLDER__ before deploying.
+
+package_update: true
+package_upgrade: true
+timezone: America/Sao_Paulo
+
+groups:
+  - app
+
+users:
+  - name: deploy
+    groups: [sudo, app]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: true
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+
+  - name: app
+    system: true
+    shell: /usr/sbin/nologin
+    groups: [app]
+    lock_passwd: true
+
+ssh_pwauth: false
+disable_root: true
+
+packages:
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - curl
+  - ca-certificates
+  - gnupg
+  - jq
+  - sqlite3
+
+write_files:
+  - path: /etc/fail2ban/jail.d/sshd.local
+    permissions: "0644"
+    owner: root:root
+    content: |
+      [DEFAULT]
+      backend = systemd
+      banaction = ufw
+
+      [sshd]
+      enabled = true
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    permissions: "0644"
+    owner: root:root
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /opt/bootstrap/Caddyfile
+    permissions: "0644"
+    owner: root:root
+    content: |
+      {
+        admin off
+      }
+
+      __DOMAIN__ {
+        tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:3000
+      }
+
+  - path: /opt/bootstrap/origin.pem
+    permissions: "0600"
+    owner: root:root
+    content: |
+      __CLOUDFLARE_ORIGIN_CERT_PEM__
+
+  - path: /opt/bootstrap/origin.key
+    permissions: "0600"
+    owner: root:root
+    content: |
+      __CLOUDFLARE_ORIGIN_KEY_PEM__
+
+  - path: /opt/bootstrap/litestream.yml
+    permissions: "0600"
+    owner: root:root
+    content: |
+      dbs:
+        - path: /var/lib/app/data.db
+          replica:
+            type: s3
+            endpoint: __S3_ENDPOINT__
+            region: __S3_REGION__
+            bucket: __S3_BUCKET__
+            path: data.db
+            access-key-id: __S3_ACCESS_KEY_ID__
+            secret-access-key: __S3_SECRET_ACCESS_KEY__
