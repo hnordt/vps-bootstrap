@@ -6,12 +6,14 @@ disable_root: true
 package_upgrade: true
 
 packages:
+  - ca-certificates
   - curl
   - debian-archive-keyring
   - debian-keyring
   - fail2ban
   - gpg
   - nodejs
+  - ufw
   - unattended-upgrades
 
 groups:
