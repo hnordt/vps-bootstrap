@@ -34,6 +34,26 @@ users:
     lock_passwd: true
 
 write_files:
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+  - path: /etc/fail2ban/jail.d/sshd.local
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      banaction = ufw
+      port = ssh
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
   - path: /opt/hello/server.js
     owner: root:root
     permissions: "0644"
@@ -84,26 +104,6 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
-
-  - path: /etc/apt/apt.conf.d/20auto-upgrades
-    owner: root:root
-    permissions: "0644"
-    content: |
-      APT::Periodic::Update-Package-Lists "1";
-      APT::Periodic::Unattended-Upgrade "1";
-
-  - path: /etc/fail2ban/jail.d/sshd.local
-    owner: root:root
-    permissions: "0644"
-    content: |
-      [sshd]
-      enabled = true
-      backend = systemd
-      banaction = ufw
-      port = ssh
-      maxretry = 5
-      findtime = 10m
-      bantime = 1h
 
 runcmd:
   # Enable automatic updates
