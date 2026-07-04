@@ -82,11 +82,10 @@ write_files:
         encode zstd gzip
 
         header {
-          defer
-          Strict-Transport-Security "max-age=31536000"
-          X-Frame-Options "DENY"
-          X-Content-Type-Options "nosniff"
-          Referrer-Policy "strict-origin-when-cross-origin"
+          >Strict-Transport-Security "max-age=31536000"
+          >X-Frame-Options "DENY"
+          >X-Content-Type-Options "nosniff"
+          >Referrer-Policy "strict-origin-when-cross-origin"
         }
 
         reverse_proxy 127.0.0.1:3000 {
