@@ -3,10 +3,6 @@ import * as fs from "node:fs";
 import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
-const OS = {
-  minRam: 1024, // MB
-};
-
 function getUbuntuLtsVersion(name: string) {
   const match = /^Ubuntu\s+(\d+)\.(\d+)\s+LTS\b/i.exec(name);
 
@@ -163,8 +159,9 @@ const [availability, plans, operatingSystems] = await Promise.all([
 
 const debianOperatingSystems = operatingSystems.os
   .filter((operatingSystem) => operatingSystem.family === "debian")
-  .sort((left, right) =>
-    compareUbuntuLtsVersions(left.name, right.name) || left.id - right.id,
+  .sort(
+    (left, right) =>
+      compareUbuntuLtsVersions(left.name, right.name) || left.id - right.id,
   );
 
 const defaultOperatingSystem = debianOperatingSystems.find((operatingSystem) =>
@@ -189,10 +186,7 @@ const availablePlanIds = new Set(availability.available_plans);
 
 const availablePlans = plans.plans
   .filter(
-    (plan) =>
-      availablePlanIds.has(plan.id) &&
-      plan.locations.includes(region) &&
-      plan.ram >= OS.minRam,
+    (plan) => availablePlanIds.has(plan.id) && plan.locations.includes(region),
   )
   .sort(
     (left, right) =>
