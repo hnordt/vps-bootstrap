@@ -4,7 +4,7 @@ import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
 const OS = {
-  id: 2760, // Ubuntu 22.04 LTS x64
+  id: 2760, // Ubuntu 26.04 LTS x64
   minRam: 1024, // MB
 };
 
