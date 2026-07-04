@@ -1,10 +1,10 @@
 import * as path from "node:path";
-import * as fs from "node:fs";
+import * as fs from "node:fs/promises";
 import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
 async function sendRequest<T extends z.ZodTypeAny>(
-  apiKey: string,
+  apiKey: string | null,
   pathname: string,
   responseSchema: T,
   body?: Record<string, string | number | boolean | null | undefined>,
@@ -12,7 +12,7 @@ async function sendRequest<T extends z.ZodTypeAny>(
   const response = await fetch(new URL(pathname, "https://api.vultr.com"), {
     method: body ? "POST" : "GET",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...(apiKey && { Authorization: `Bearer ${apiKey}` }),
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -25,16 +25,65 @@ async function sendRequest<T extends z.ZodTypeAny>(
   return responseSchema.parse(await response.json());
 }
 
-const sshAuthorizedKeys = await p.input({
-  message: "SSH authorized keys (comma-separated)",
-  validate(value) {
-    return (
-      value
-        .split(",")
-        .map((key) => key.trim())
-        .filter(Boolean).length > 0 || "Enter at least one SSH authorized key"
-    );
-  },
+const regionId = await p.select({
+  message: "Select a Vultr region",
+  choices: (
+    await sendRequest(
+      null,
+      "/v2/regions",
+      z.object({
+        regions: z.array(
+          z.object({
+            id: z.string(),
+            city: z.string(),
+            country: z.string(),
+          }),
+        ),
+      }),
+    )
+  ).regions.map((region) => ({
+    name: `${region.city}, ${region.country} (${region.id})`,
+    value: region.id,
+  })),
+});
+
+const planId = await p.select({
+  message: "Select a Vultr plan",
+  choices: (
+    await sendRequest(
+      null,
+      `/v2/regions/${regionId}/availability`,
+      z.object({
+        available_plans: z.array(z.string()),
+      }),
+    )
+  ).available_plans,
+});
+
+const osId = await p.select({
+  message: "Select a Vultr operating system",
+  choices: (
+    await sendRequest(
+      null,
+      "/v2/os",
+      z.object({
+        os: z.array(
+          z.object({
+            id: z.number(),
+            name: z.string(),
+            family: z.string(),
+            arch: z.string(),
+          }),
+        ),
+      }),
+    )
+  ).os
+    .filter((os) => os.family === "ubuntu" || os.family === "debian")
+    .toSorted((left, right) => right.name.localeCompare(left.name))
+    .map((os) => ({
+      name: os.name,
+      value: os.id,
+    })),
 });
 
 const publicDomain = await p.input({
@@ -48,114 +97,19 @@ const publicDomain = await p.input({
   },
 });
 
-const apiKey = await p.password({
-  message: "Vultr API key",
-  mask: "*",
+const sshAuthorizedKeys = await p.input({
+  message: "SSH authorized keys (comma-separated)",
   validate(value) {
-    return value.trim().length > 0 || "This value is required";
+    return (
+      value
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean).length > 0 || "Enter at least one SSH authorized key"
+    );
   },
 });
 
-const regions = await sendRequest(
-  apiKey,
-  "/v2/regions?per_page=500",
-  z.object({
-    regions: z.array(
-      z.object({
-        id: z.string(),
-        city: z.string(),
-        country: z.string(),
-      }),
-    ),
-  }),
-);
-
-const region = await p.select({
-  message: "Select a Vultr region",
-  choices: regions.regions.map((region) => ({
-    name: `${region.city}, ${region.country} (${region.id})`,
-    value: region.id,
-  })),
-  pageSize: 15,
-});
-
-const [availability, plans, oses] = await Promise.all([
-  sendRequest(
-    apiKey,
-    `/v2/regions/${region}/availability`,
-    z.object({
-      available_plans: z.array(z.string()),
-    }),
-  ),
-  sendRequest(
-    apiKey,
-    "/v2/plans?per_page=500",
-    z.object({
-      plans: z.array(
-        z.object({
-          id: z.string(),
-          vcpu_count: z.number(),
-          ram: z.number(),
-          disk: z.number(),
-          bandwidth: z.number(),
-          monthly_cost: z.number(),
-          type: z.string(),
-          locations: z.array(z.string()),
-        }),
-      ),
-    }),
-  ),
-  sendRequest(
-    apiKey,
-    "/v2/os?per_page=500",
-    z.object({
-      os: z.array(
-        z.object({
-          id: z.number(),
-          name: z.string(),
-          family: z.string(),
-          arch: z.string(),
-        }),
-      ),
-    }),
-  ),
-]);
-
-const osId = await p.select({
-  message: "Select a Vultr operating system",
-  choices: oses.os
-    .filter((os) => os.family === "ubuntu" || os.family === "debian")
-    .toSorted((left, right) => right.name.localeCompare(left.name))
-    .map((os) => ({ name: os.name, value: os.id })),
-  pageSize: 15,
-});
-
-const availablePlanIds = new Set(availability.available_plans);
-
-const availablePlans = plans.plans
-  .filter(
-    (plan) => availablePlanIds.has(plan.id) && plan.locations.includes(region),
-  )
-  .sort(
-    (left, right) =>
-      left.monthly_cost - right.monthly_cost ||
-      left.vcpu_count - right.vcpu_count ||
-      left.ram - right.ram ||
-      left.id.localeCompare(right.id),
-  );
-
-const plan = await p.select({
-  message: "Select a Vultr plan",
-  choices: availablePlans.map((plan) => ({
-    name: `${plan.id} - ${plan.vcpu_count} vCPU, ${plan.ram} MB RAM, ${plan.disk} GB disk, $${
-      plan.monthly_cost
-    }/mo`,
-    value: plan.id,
-  })),
-  pageSize: 15,
-});
-
-let cloudConfig = fs.readFileSync(
+let cloudConfig = await fs.readFile(
   path.join(import.meta.dirname, "cloud-config.yaml"),
   "utf8",
 );
@@ -174,6 +128,14 @@ cloudConfig = cloudConfig.replace(
   publicDomain.trim().toLowerCase(),
 );
 
+const apiKey = await p.password({
+  message: "Vultr API key",
+  mask: "*",
+  validate(value) {
+    return value.trim().length > 0 || "This value is required";
+  },
+});
+
 const instance = await sendRequest(
   apiKey,
   "/v2/instances",
@@ -183,8 +145,8 @@ const instance = await sendRequest(
     }),
   }),
   {
-    region,
-    plan,
+    region: regionId,
+    plan: planId,
     os_id: osId,
     user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
   },
