@@ -175,5 +175,5 @@ const instance = await sendRequest(
 );
 
 console.info(
-  `Vultr instance created: https://console.vultr.com/subs/?id=${instance.instance.id}`,
+  `\nVultr instance created:\nhttps://console.vultr.com/subs/?id=${instance.instance.id}`,
 );
