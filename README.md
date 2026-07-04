@@ -1,6 +1,6 @@
 # VPS Bootstrap
 
-Cloud-init setup for running a small production-oriented Node.js server on a VPS provider behind Cloudflare.
+Cloud-init setup for running a production-oriented Node.js server on a single VPS behind Cloudflare.
 
 The default setup targets Ubuntu 24.04 LTS and includes:
 
@@ -16,7 +16,7 @@ The default setup targets Ubuntu 24.04 LTS and includes:
 
 ## Goal
 
-This repository provides a predictable baseline for a small VPS.
+This repository provides a predictable baseline for a single-VPS deployment.
 
 ```txt
 browser -> Cloudflare edge -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
