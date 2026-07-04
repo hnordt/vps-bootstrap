@@ -80,7 +80,9 @@ write_files:
     content: |
       ${{ __PUBLIC_DOMAIN__ }} {
         encode zstd gzip
-        reverse_proxy 127.0.0.1:3000
+        reverse_proxy 127.0.0.1:3000 {
+          header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+        }
       }
 
   - path: /etc/systemd/system/hello-node.service
@@ -105,12 +107,24 @@ write_files:
 
 runcmd:
   # Set up UFW
-  - ufw default deny incoming
-  - ufw default allow outgoing
-  - ufw limit 22/tcp
-  - ufw allow 80/tcp
-  - ufw allow 443/tcp
-  - ufw --force enable
+  - |
+    set -eu
+
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw limit 22/tcp
+
+    for range in $(curl -fsSL https://www.cloudflare.com/ips-v4); do
+      ufw allow from "$range" to any port 80 proto tcp
+      ufw allow from "$range" to any port 443 proto tcp
+    done
+
+    for range in $(curl -fsSL https://www.cloudflare.com/ips-v6); do
+      ufw allow from "$range" to any port 80 proto tcp
+      ufw allow from "$range" to any port 443 proto tcp
+    done
+
+    ufw --force enable
 
   # Set up Caddy
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
