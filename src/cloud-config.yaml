@@ -34,6 +34,57 @@ users:
     lock_passwd: true
 
 write_files:
+  - path: /opt/hello/server.js
+    owner: root:root
+    permissions: "0644"
+    content: |
+      const http = require("http");
+
+      const host = "127.0.0.1";
+      const port = 3000;
+
+      const server = http.createServer((request, response) => {
+        response.writeHead(200, {
+          "Content-Type": "text/plain; charset=utf-8",
+        });
+        response.end("Hello world\n");
+      });
+
+      server.listen(port, host, () => {
+        console.log(`Hello world server listening on http://${host}:${port}`);
+      });
+
+  - path: /opt/hello/Caddyfile
+    owner: root:root
+    permissions: "0644"
+    content: |
+      ${{ __PUBLIC_DOMAIN__ }} {
+        encode zstd gzip
+        reverse_proxy 127.0.0.1:3000
+      }
+
+  - path: /etc/systemd/system/hello-node.service
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Node.js hello world server
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=app
+      Group=app
+      WorkingDirectory=/opt/hello
+      ExecStart=/usr/bin/node /opt/hello/server.js
+      Restart=always
+      RestartSec=5
+      Environment=NODE_ENV=production
+
+      [Install]
+      WantedBy=multi-user.target
+
   - path: /etc/apt/apt.conf.d/20auto-upgrades
     owner: root:root
     permissions: "0644"
@@ -59,6 +110,8 @@ runcmd:
   - ufw default deny incoming
   - ufw default allow outgoing
   - ufw limit 22/tcp comment "SSH"
+  - ufw allow 80/tcp comment "HTTP"
+  - ufw allow 443/tcp comment "HTTPS"
   - ufw --force enable
 
   # Enable SSH brute-force protection
@@ -71,7 +124,14 @@ runcmd:
   - chmod o+r /etc/apt/sources.list.d/caddy-stable.list
   - apt-get update
   - apt-get install -y caddy
-  - systemctl enable --now caddy
+
+  # Start the Node.js app behind Caddy
+  - systemctl daemon-reload
+  - systemctl enable --now hello-node
+  - install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
+  - caddy validate --config /etc/caddy/Caddyfile
+  - systemctl enable caddy
+  - systemctl restart caddy
 
   # Enable automatic updates
   - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer

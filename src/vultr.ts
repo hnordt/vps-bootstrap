@@ -42,6 +42,18 @@ const sshAuthorizedKeys = await p.input({
   },
 });
 
+const publicDomain = await p.input({
+  message: "Public domain for HTTPS",
+  validate(value) {
+    const domain = value.trim().toLowerCase();
+    return (
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+        domain,
+      ) || "Enter a valid public domain, like example.com"
+    );
+  },
+});
+
 const apiKey = await p.password({
   message: "Vultr API key",
   mask: "*",
@@ -141,6 +153,10 @@ cloudConfig = cloudConfig.replace(
       .map((key) => key.trim())
       .filter(Boolean),
   ),
+);
+cloudConfig = cloudConfig.replace(
+  "${{ __PUBLIC_DOMAIN__ }}",
+  publicDomain.trim().toLowerCase(),
 );
 
 const instance = await sendRequest(
