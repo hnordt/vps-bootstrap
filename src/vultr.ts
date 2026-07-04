@@ -10,11 +10,11 @@ const OS = {
 
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
-  endpoint: string,
+  pathname: string,
   schema: T,
   body?: Record<string, any>,
 ) {
-  const response = await fetch("https://api.vultr.com" + endpoint, {
+  const response = await fetch(new URL(pathname, "https://api.vultr.com"), {
     method: body ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
