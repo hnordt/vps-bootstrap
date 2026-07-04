@@ -367,10 +367,10 @@ set -eu
 
 host="deploy@YOUR_SERVER_IP"
 
-scp dist/server.js "$host:server.js.next"
+scp dist/server.mjs "$host:server.mjs.next"
 ssh "$host" "
-  sudo install -o root -g root -m 0644 server.js.next /opt/app/server.js
-  rm server.js.next
+  sudo install -o root -g root -m 0644 server.mjs.next /opt/app/server.mjs
+  rm server.mjs.next
   sudo systemctl restart app
   systemctl is-active app
 "
@@ -397,9 +397,9 @@ To change what the server provisions, edit `src/cloud-config.yaml`.
 
 Common changes:
 
-- Replace `/opt/app/server.js` with your application bootstrap.
+- Replace `/opt/app/server.mjs` with your application bootstrap.
 - Adjust `ExecStart` in `app.service` if your deploy ships something other
-  than `node server.js`, such as a compiled binary.
+  than `node server.mjs`, such as a compiled binary.
 - Change `/etc/caddy/Caddyfile` for routing, headers, or additional domains.
 - Adjust UFW rules if the server should only accept traffic from a trusted edge.
 - Change `/etc/litestream.yml` if your app uses a different database path or

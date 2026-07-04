@@ -64,7 +64,7 @@ write_files:
       # Add app config and secrets as KEY=value lines.
       # Prefer injecting real secrets after provisioning.
 
-  - path: /opt/app/server.js
+  - path: /opt/app/server.mjs
     owner: root:root
     permissions: "0644"
     content: |
@@ -168,7 +168,7 @@ write_files:
       StateDirectory=app
       StateDirectoryMode=0700
       EnvironmentFile=-/etc/app/.env
-      ExecStart=/usr/bin/node /opt/app/server.js
+      ExecStart=/usr/bin/node /opt/app/server.mjs
       Restart=always
       RestartSec=5
       NoNewPrivileges=true
