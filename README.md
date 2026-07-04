@@ -214,7 +214,6 @@ To change Vultr-specific defaults, edit `src/vultr.ts`.
 Common changes:
 
 - the default operating system selector, which fetches Debian-family Vultr images and preselects the latest Ubuntu LTS image.
-- `OS.minRam`: the minimum RAM used when filtering plans.
 - instance creation options in the `/v2/instances` request body.
 
 ## Security Notes
@@ -231,7 +230,6 @@ production secrets directly in `src/cloud-config.yaml`.
 
 Before using this as a production baseline, review:
 
-- whether the selected Ubuntu LTS image in `src/vultr.ts` is the one you want
 - whether your provisioning environment can reach Cloudflare's IP range endpoints
 - whether the app service should run your real app instead of the hello-world server
 - whether the default security headers match your embedding, referrer, and subdomain policy
