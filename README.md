@@ -104,10 +104,11 @@ The rendered cloud-config is sent to Vultr; it is not written to a local file.
 
 ## App Config And Secrets
 
-The `hello-node` systemd service loads environment variables from `/etc/hello/.env` at startup.
+The `hello-node` systemd service loads environment variables from
+`/etc/hello/.env` at startup when the file exists.
 
-This env file is created by cloud-init and required by the service. If it is
-missing, unreadable, or invalid, `hello-node` will fail to start. Values in
+This env file is created by cloud-init, but the service treats it as optional so
+`hello-node` can still start if the file is not present yet. Values in
 `/etc/hello/.env` should use systemd environment-file syntax:
 
 ```ini
@@ -123,6 +124,10 @@ after provisioning, edit the file as root and restart the service:
 sudoedit /etc/hello/.env
 sudo systemctl restart hello-node
 ```
+
+The sample app and Caddy upstream are both bound to `127.0.0.1:3000`. If you
+change the app listener, update the Caddy `reverse_proxy` target at the same
+time instead of setting only `PORT` in `/etc/hello/.env`.
 
 Do not commit real secrets to `src/cloud-config.yaml`. Cloud-init user data is
 sent to the VPS provider, may be retained by the provider, and can be read from

@@ -63,6 +63,7 @@ write_files:
   - path: /etc/hello/.env
     owner: root:app
     permissions: "0640"
+    defer: true
     content: |
       # Add app config and secrets as KEY=value lines.
       # Prefer injecting real secrets after provisioning.
@@ -74,7 +75,7 @@ write_files:
       const http = require("http");
 
       const host = "127.0.0.1";
-      const port = process.env.PORT ?? 3000;
+      const port = 3000;
 
       const server = http.createServer((request, response) => {
         response.writeHead(200, {
@@ -127,7 +128,7 @@ write_files:
       [Service]
       User=app
       WorkingDirectory=/opt/hello
-      EnvironmentFile=/etc/hello/.env
+      EnvironmentFile=-/etc/hello/.env
       ExecStart=/usr/bin/node /opt/hello/server.js
       Restart=always
       RestartSec=5
