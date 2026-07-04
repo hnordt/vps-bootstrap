@@ -155,15 +155,34 @@ ranges from `https://www.cloudflare.com/ips-v4` and
 and `443/tcp` from those ranges only. Direct origin HTTP/HTTPS requests from
 non-Cloudflare IP addresses are blocked by UFW.
 
+Because Caddy obtains public certificates through ACME HTTP-01, keep the DNS
+record **Proxied** at all times: Caddy renews certificates automatically in the
+background, and renewal has the same reachability requirement as first
+issuance. With this firewall policy, Let's Encrypt can only reach the HTTP-01
+challenge through Cloudflare's proxy. If you switch the record to **DNS only**,
+the site goes down immediately: browsers connect directly to the origin from
+non-Cloudflare IP addresses, and UFW blocks them. Certificate renewal also
+fails while the record is DNS only. Check `journalctl -u caddy` for renewal
+errors, renewals can also fail silently while **Proxied** if a Cloudflare
+redirect or WAF rule interferes with the HTTP-01 challenge path.
+
+If you stay **Proxied** and want to remove the ACME reachability dependency
+entirely, use a Cloudflare origin certificate or configure Caddy for DNS-01
+validation. If you want a **DNS only** record instead, you must also open ports
+80 and 443 to all sources in UFW — the Cloudflare-only rules block every
+visitor, not just Let's Encrypt — after which standard certificate issuance
+works directly. Note that Cloudflare origin certificates only work behind the
+proxy; browsers do not trust them on direct connections.
+
 The VPS does not automatically refresh Cloudflare IP ranges after provisioning.
 Cloudflare changes these ranges infrequently, and this keeps the generated UFW
 configuration immutable unless you intentionally update it. If Cloudflare
 publishes new ranges that your site needs, update the UFW allow rules
 deliberately and audit the resulting firewall state.
 
-If the Cloudflare IP range fetch fails, the UFW setup command fails before
-running `ufw --force enable`. This keeps the origin from being opened with stale
-or incomplete HTTP/HTTPS allow rules.
+UFW is enabled with the default-deny policy before the Cloudflare IP ranges are
+fetched. If the fetch fails, the origin fails closed: SSH stays reachable, but
+HTTP/HTTPS remains blocked until the Cloudflare allow rules are added.
 
 Caddy is configured for the domain you entered and forwards Cloudflare's
 `CF-Connecting-IP` value as `X-Forwarded-For`, so the Node.js app can receive
