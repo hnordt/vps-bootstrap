@@ -137,12 +137,11 @@ runcmd:
     ufw default allow outgoing
     ufw limit 22/tcp
 
-    for range in $(curl -fsSL https://www.cloudflare.com/ips-v4); do
-      ufw allow from "$range" to any port 80 proto tcp
-      ufw allow from "$range" to any port 443 proto tcp
-    done
-
-    for range in $(curl -fsSL https://www.cloudflare.com/ips-v6); do
+    cloudflare_ips="$(
+      curl -fsSL https://www.cloudflare.com/ips-v4
+      curl -fsSL https://www.cloudflare.com/ips-v6
+    )"
+    for range in $cloudflare_ips; do
       ufw allow from "$range" to any port 80 proto tcp
       ufw allow from "$range" to any port 443 proto tcp
     done
@@ -150,24 +149,43 @@ runcmd:
     ufw --force enable
 
   # Set up Caddy
-  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
-  - chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  - chmod o+r /etc/apt/sources.list.d/caddy-stable.list
-  - apt-get update
-  - apt-get install -y caddy
+  - |
+    set -eu
+
+    curl -fsSL -o /run/caddy-stable-gpg.key https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+    gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg /run/caddy-stable-gpg.key
+    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+
+    curl -fsSL -o /etc/apt/sources.list.d/caddy-stable.list https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt
+    chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+
+    apt-get update
+    apt-get install -y caddy
 
   # Set up Litestream
-  - curl -L -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
-  - dpkg -i /tmp/litestream.deb
-  - systemctl enable --now litestream
+  - |
+    set -eu
 
-  # Set up the Node.js app behind Caddy
-  - systemctl daemon-reload
-  - systemctl enable --now hello-node
-  - install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
-  - caddy validate --config /etc/caddy/Caddyfile
-  - systemctl restart caddy
+    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
+    dpkg -i /run/litestream.deb
+
+    systemctl enable --now litestream
+
+  # Set up the Node.js service
+  - |
+    set -eu
+
+    systemctl daemon-reload
+    systemctl enable --now hello-node
+
+  # Set up Caddy as the reverse proxy
+  - |
+    set -eu
+
+    install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
+    caddy validate --config /etc/caddy/Caddyfile
+
+    systemctl restart caddy
 
 power_state:
   mode: reboot
