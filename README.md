@@ -142,7 +142,6 @@ This repository's Caddy setup adds baseline HTTP security headers to every
 response served by the public site block:
 
 ```txt
-Permissions-Policy: interest-cohort=()
 Strict-Transport-Security: max-age=31536000
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
@@ -151,7 +150,6 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 These headers define the following browser-side defaults:
 
-- Browsers are opted out of FLoC-style interest cohort tracking.
 - HTTPS is required for future requests to the configured domain.
 - Browsers should not MIME-sniff responses away from their declared content type.
 - The site cannot be embedded in a frame.

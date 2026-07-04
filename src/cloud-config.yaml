@@ -84,9 +84,6 @@ write_files:
         header {
           defer
 
-          # Disable FLoC tracking.
-          Permissions-Policy "interest-cohort=()"
-
           # Enable HSTS for the configured domain.
           Strict-Transport-Security "max-age=31536000"
 
