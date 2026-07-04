@@ -129,6 +129,9 @@ write_files:
       User=app
       WorkingDirectory=/opt/hello
       EnvironmentFile=-/etc/hello/.env
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      PrivateTmp=true
       ExecStart=/usr/bin/node /opt/hello/server.js
       Restart=always
       RestartSec=5
