@@ -120,6 +120,12 @@ ranges from `https://www.cloudflare.com/ips-v4` and
 and `443/tcp` from those ranges only. Direct origin HTTP/HTTPS requests from
 non-Cloudflare IP addresses are blocked by UFW.
 
+The VPS does not automatically refresh Cloudflare IP ranges after provisioning.
+Cloudflare changes these ranges infrequently, and this keeps the generated UFW
+configuration immutable unless you intentionally update it. If Cloudflare
+publishes new ranges that your site needs, update the UFW allow rules
+deliberately and audit the resulting firewall state.
+
 If the Cloudflare IP range fetch fails, the UFW setup command fails before
 running `ufw --force enable`. This keeps the origin from being opened with stale
 or incomplete HTTP/HTTPS allow rules.
