@@ -105,41 +105,84 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
+  - path: /usr/local/sbin/bootstrap-auto-upgrades
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+
+  - path: /usr/local/sbin/bootstrap-firewall
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      ufw default deny incoming
+      ufw default allow outgoing
+      ufw limit 22/tcp comment "SSH"
+      ufw allow 80/tcp comment "HTTP"
+      ufw allow 443/tcp comment "HTTPS"
+      ufw --force enable
+
+  - path: /usr/local/sbin/bootstrap-fail2ban
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      systemctl enable --now fail2ban
+
+  - path: /usr/local/sbin/bootstrap-litestream
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      curl -L -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
+      dpkg -i /tmp/litestream.deb
+      systemctl enable --now litestream
+
+  - path: /usr/local/sbin/bootstrap-app
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      systemctl daemon-reload
+      systemctl enable --now hello-node
+
+  - path: /usr/local/sbin/bootstrap-caddy
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
+      chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+      apt-get update
+      apt-get install -y caddy
+      install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
+      caddy validate --config /etc/caddy/Caddyfile
+      systemctl enable caddy
+      systemctl restart caddy
+
 runcmd:
-  # Enable automatic updates
-  - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
-
-  # Configure UFW
-  - ufw default deny incoming
-  - ufw default allow outgoing
-  - ufw limit 22/tcp comment "SSH"
-  - ufw allow 80/tcp comment "HTTP"
-  - ufw allow 443/tcp comment "HTTPS"
-  - ufw --force enable
-
-  # Enable SSH brute-force protection
-  - systemctl enable --now fail2ban
-
-  # Install Caddy
-  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
-  - chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  - chmod o+r /etc/apt/sources.list.d/caddy-stable.list
-  - apt-get update
-  - apt-get install -y caddy
-
-  # Install Litestream
-  - curl -L -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
-  - dpkg -i /tmp/litestream.deb
-  - systemctl enable --now litestream
-
-  # Start the Node.js app behind Caddy
-  - systemctl daemon-reload
-  - systemctl enable --now hello-node
-  - install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
-  - caddy validate --config /etc/caddy/Caddyfile
-  - systemctl enable caddy
-  - systemctl restart caddy
+  - [ /usr/local/sbin/bootstrap-auto-upgrades ]
+  - [ /usr/local/sbin/bootstrap-firewall ]
+  - [ /usr/local/sbin/bootstrap-fail2ban ]
+  - [ /usr/local/sbin/bootstrap-litestream ]
+  - [ /usr/local/sbin/bootstrap-app ]
+  - [ /usr/local/sbin/bootstrap-caddy ]
 
 power_state:
   mode: reboot
