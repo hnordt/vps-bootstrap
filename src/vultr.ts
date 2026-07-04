@@ -4,9 +4,44 @@ import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
 const OS = {
-  id: 2760, // Ubuntu 26.04 LTS x64
   minRam: 1024, // MB
 };
+
+function getUbuntuLtsVersion(name: string) {
+  const match = /^Ubuntu\s+(\d+)\.(\d+)\s+LTS\b/i.exec(name);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+  };
+}
+
+function compareUbuntuLtsVersions(left: string, right: string) {
+  const leftVersion = getUbuntuLtsVersion(left);
+  const rightVersion = getUbuntuLtsVersion(right);
+
+  if (!leftVersion && !rightVersion) {
+    return left.localeCompare(right);
+  }
+
+  if (!leftVersion) {
+    return 1;
+  }
+
+  if (!rightVersion) {
+    return -1;
+  }
+
+  return (
+    rightVersion.major - leftVersion.major ||
+    rightVersion.minor - leftVersion.minor ||
+    left.localeCompare(right)
+  );
+}
 
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
@@ -84,7 +119,7 @@ const region = await p.select({
   pageSize: 15,
 });
 
-const [availability, plans] = await Promise.all([
+const [availability, plans, operatingSystems] = await Promise.all([
   sendRequest(
     apiKey,
     `/v2/regions/${region}/availability`,
@@ -110,7 +145,45 @@ const [availability, plans] = await Promise.all([
       ),
     }),
   ),
+  sendRequest(
+    apiKey,
+    "/v2/os?family=debian",
+    z.object({
+      os: z.array(
+        z.object({
+          id: z.number(),
+          name: z.string(),
+          arch: z.string(),
+          family: z.string(),
+        }),
+      ),
+    }),
+  ),
 ]);
+
+const debianOperatingSystems = operatingSystems.os
+  .filter((operatingSystem) => operatingSystem.family === "debian")
+  .sort((left, right) =>
+    compareUbuntuLtsVersions(left.name, right.name) || left.id - right.id,
+  );
+
+const defaultOperatingSystem = debianOperatingSystems.find((operatingSystem) =>
+  getUbuntuLtsVersion(operatingSystem.name),
+);
+
+if (!defaultOperatingSystem) {
+  throw new Error("Vultr did not return any Ubuntu LTS operating systems");
+}
+
+const operatingSystem = await p.select({
+  message: "Select a Vultr operating system",
+  choices: debianOperatingSystems.map((operatingSystem) => ({
+    name: `${operatingSystem.name} (${operatingSystem.arch}, ${operatingSystem.id})`,
+    value: operatingSystem.id,
+  })),
+  default: defaultOperatingSystem.id,
+  pageSize: 15,
+});
 
 const availablePlanIds = new Set(availability.available_plans);
 
@@ -170,7 +243,7 @@ const instance = await sendRequest(
   {
     region,
     plan,
-    os_id: OS.id,
+    os_id: operatingSystem,
     user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
   },
 );
