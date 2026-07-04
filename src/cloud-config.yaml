@@ -70,42 +70,86 @@ write_files:
     content: |
       import * as http from "node:http";
       import * as path from "node:path";
-      import { DatabaseSync } from "node:sqlite";
 
-      const host = "127.0.0.1";
-      const port = 3000;
+      const HOST = "127.0.0.1";
+      const PORT = 3000;
 
-      const db = new DatabaseSync(
-        path.join(process.env.STATE_DIRECTORY ?? ".", "app.db"),
-      );
+      async function createCounter(name) {
+        let sqlite;
 
-      db.exec("PRAGMA journal_mode = WAL");
-      db.exec("PRAGMA synchronous = NORMAL");
-      db.exec("PRAGMA busy_timeout = 5000");
-      db.exec("PRAGMA foreign_keys = ON");
+        try {
+          sqlite = await import("node:sqlite");
+        } catch (error) {
+          if (
+            !(
+              error?.code === "ERR_UNKNOWN_BUILTIN_MODULE" ||
+              (error?.code === "ERR_MODULE_NOT_FOUND" &&
+                String(error.message).includes("node:sqlite"))
+            )
+          ) {
+            throw error;
+          }
 
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS visits (
-          id INTEGER PRIMARY KEY,
-          visited_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-      `);
+          console.warn(
+            "node:sqlite is unavailable; using an in-memory visit counter",
+          );
 
-      const insertVisit = db.prepare("INSERT INTO visits DEFAULT VALUES");
-      const countVisits = db.prepare("SELECT count(*) AS count FROM visits");
+          let count = 0;
+
+          return {
+            increment() {
+              count += 1;
+              return count;
+            },
+          };
+        }
+
+        const db = new sqlite.DatabaseSync(
+          path.join(process.env.STATE_DIRECTORY ?? ".", "app.db"),
+        );
+
+        db.exec("PRAGMA journal_mode = WAL");
+        db.exec("PRAGMA synchronous = NORMAL");
+        db.exec("PRAGMA busy_timeout = 5000");
+        db.exec("PRAGMA foreign_keys = ON");
+
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS counters (
+            name TEXT PRIMARY KEY,
+            value INTEGER NOT NULL DEFAULT 0 CHECK (value >= 0),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        `);
+
+        db.prepare(
+          `INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO NOTHING`,
+        ).run(name, 0);
+
+        const increment =
+          db.prepare(`UPDATE counters SET value = value + 1, updated_at = datetime('now') WHERE name = ? RETURNING value
+        `);
+
+        return {
+          increment() {
+            return increment.get(name).value;
+          },
+        };
+      }
+
+      const visitCounter = await createCounter("visits");
 
       const server = http.createServer((request, response) => {
-        insertVisit.run();
-        const { count } = countVisits.get();
+        const visits = visitCounter.increment();
 
         response.writeHead(200, {
           "Content-Type": "text/plain; charset=utf-8",
         });
-        response.end(`Visits: ${count}\n`);
+
+        response.end(`Visits: ${visits}\n`);
       });
 
-      server.listen(port, host, () => {
-        console.log(`Server listening on http://${host}:${port}`);
+      server.listen(PORT, HOST, () => {
+        console.log(`Server listening on http://${HOST}:${PORT}`);
       });
 
   - path: /etc/systemd/system/app.service

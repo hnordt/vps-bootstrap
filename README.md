@@ -27,8 +27,8 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - UFW firewall rules for SSH and Cloudflare-proxied HTTP/HTTPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
-- a simple Node.js hello-world app bound to `127.0.0.1:3000`, backed by a
-  SQLite database created with the built-in `node:sqlite` module
+- a simple Node.js hello-world app bound to `127.0.0.1:3000`, backed by
+  SQLite via the built-in `node:sqlite` module when available
 - a root-owned app environment file at `/etc/app/.env`
 - Caddy as the public reverse proxy, configured with baseline HTTP security headers
 - Litestream installed from its Debian package and configured to replicate the
@@ -142,19 +142,21 @@ your deployment target supports one.
 ## Database And Backups
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
-module, so no npm dependencies are needed. `node:sqlite` requires Node.js
-v22.13.0 or newer, which the Ubuntu 26.04 `nodejs` package satisfies.
+module, so no npm dependencies are needed. On runtimes that do not provide
+`node:sqlite`, the server logs a warning and falls back to an in-memory visit
+counter instead of crashing. That fallback is not persisted or replicated by
+Litestream.
 
-The database lives at `/var/lib/app/app.db`. The `app` service uses
-`StateDirectory=app`, so systemd creates `/var/lib/app` owned by the `app`
-user, and it is the only path the hardened service can write to. The directory
-is created with `0700` permissions (`StateDirectoryMode=0700`) and the service
-runs with `UMask=0077`, so the database and WAL files are not readable by
-other service accounts, such as `caddy`. The app reads
-the directory from the `STATE_DIRECTORY` environment variable that systemd
-sets, and falls back to the current directory when run outside systemd. On
-startup the app enables WAL journal mode, which Litestream requires, and
-creates a `visits` table that it increments on every request.
+When SQLite is available, the database lives at `/var/lib/app/app.db`. The
+`app` service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
+owned by the `app` user, and it is the only path the hardened service can write
+to. The directory is created with `0700` permissions
+(`StateDirectoryMode=0700`) and the service runs with `UMask=0077`, so the
+database and WAL files are not readable by other service accounts, such as
+`caddy`. The app reads the directory from the `STATE_DIRECTORY` environment
+variable that systemd sets, and falls back to the current directory when run
+outside systemd. On startup the app enables WAL journal mode, which Litestream
+requires, and creates a `visits` table that it increments on every request.
 
 Litestream continuously replicates the database. Cloud-init writes its
 configuration to `/etc/litestream.yml`, and the default replica is a local
