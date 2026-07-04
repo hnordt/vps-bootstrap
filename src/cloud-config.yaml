@@ -80,6 +80,23 @@ write_files:
     content: |
       ${{ __PUBLIC_DOMAIN__ }} {
         encode zstd gzip
+
+        header {
+          defer
+
+          # Enable HSTS for the configured domain
+          Strict-Transport-Security "max-age=31536000"
+
+          # Disable clients from sniffing the media type
+          X-Content-Type-Options "nosniff"
+
+          # Add clickjacking protection
+          X-Frame-Options "DENY"
+
+          # Limit cross-origin referrer details
+          Referrer-Policy "strict-origin-when-cross-origin"
+        }
+
         reverse_proxy 127.0.0.1:3000 {
           header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
         }
