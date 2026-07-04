@@ -12,6 +12,7 @@ packages:
   - debian-archive-keyring
   - debian-keyring
   - gpg
+  - unattended-upgrades
 
 groups:
   - app
@@ -30,7 +31,16 @@ users:
     shell: /usr/sbin/nologin
     lock_passwd: true
 
+write_files:
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
 runcmd:
+  # Install Caddy
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   - chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
@@ -38,3 +48,6 @@ runcmd:
   - apt-get update
   - apt-get install -y caddy
   - systemctl enable --now caddy
+
+  # Enable automatic updates
+  - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
