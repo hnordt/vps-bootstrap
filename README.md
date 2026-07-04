@@ -1,10 +1,21 @@
 # VPS Bootstrap
 
-Generate and submit a cloud-init config for a Node.js VPS.
+Bootstrap a Node.js VPS with a reusable cloud-init template and optional
+provider automation.
 
-`src/cloud-config.yaml` is a template, and `src/vultr.ts` renders it with your
-SSH keys and public domain before creating a Vultr instance through the Vultr
-API.
+The goal of this bootstrap is to stay provider-agnostic, so the cloud-init
+template can be used with any VPS provider that accepts cloud-init user data.
+
+Currently, the repository includes an automated deployment script for Vultr.
+If you run `npm run vultr`, the script will ask you a few questions and create
+a Vultr instance.
+
+If you do not use Vultr, you can still copy `src/cloud-config.yaml`, replace the
+placeholders manually, and create the VPS instance in your preferred provider's
+console.
+
+More automated deployment scripts for other providers may be added in the
+future.
 
 ## What It Creates
 
@@ -36,6 +47,19 @@ Template placeholders:
 
 - `${{ __SSH_AUTHORIZED_KEYS__ }}`: replaced with a JSON-style YAML array of SSH public keys.
 - `${{ __PUBLIC_DOMAIN__ }}`: replaced with the domain Caddy should serve.
+
+## Manual Provider Setup
+
+To use the bootstrap template without the Vultr automation:
+
+1. Copy the contents of `src/cloud-config.yaml`.
+2. Replace `${{ __SSH_AUTHORIZED_KEYS__ }}` with a YAML array of SSH public keys.
+3. Replace `${{ __PUBLIC_DOMAIN__ }}` with the domain Caddy should serve.
+4. Paste the rendered cloud-init config into your provider's user-data or
+   cloud-init field when creating the instance.
+
+Make sure the selected server image supports cloud-init. The template is written
+for Ubuntu 24.04 LTS.
 
 ## Prerequisites
 
