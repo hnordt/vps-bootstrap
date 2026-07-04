@@ -1,10 +1,19 @@
 import * as path from "node:path";
-import * as fs from "node:fs";
+import * as fs from "node:fs/promises";
 import * as z from "zod";
+import { oraPromise } from "ora";
 import * as p from "@inquirer/prompts";
 
+process.on("uncaughtException", (error) => {
+  if (error instanceof Error && error.name === "ExitPromptError") {
+    return;
+  }
+
+  throw error;
+});
+
 async function sendRequest<T extends z.ZodTypeAny>(
-  apiKey: string,
+  apiKey: string | null,
   pathname: string,
   responseSchema: T,
   body?: Record<string, string | number | boolean | null | undefined>,
@@ -12,7 +21,7 @@ async function sendRequest<T extends z.ZodTypeAny>(
   const response = await fetch(new URL(pathname, "https://api.vultr.com"), {
     method: body ? "POST" : "GET",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      ...(apiKey && { Authorization: `Bearer ${apiKey}` }),
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -24,6 +33,98 @@ async function sendRequest<T extends z.ZodTypeAny>(
 
   return responseSchema.parse(await response.json());
 }
+
+const regionId = await p.select({
+  message: "Select a region",
+  choices: (
+    await oraPromise(
+      sendRequest(
+        null,
+        "/v2/regions",
+        z.object({
+          regions: z.array(
+            z.object({
+              id: z.string(),
+              city: z.string(),
+              country: z.string(),
+            }),
+          ),
+        }),
+      ),
+      {
+        text: "Loading regions",
+        color: "red",
+      },
+    )
+  ).regions.map((region) => ({
+    name: `${region.city}, ${region.country} (${region.id})`,
+    value: region.id,
+  })),
+});
+
+console.log("");
+
+const planId = await p.select({
+  message: "Select a plan",
+  choices: (
+    await oraPromise(
+      sendRequest(
+        null,
+        `/v2/regions/${regionId}/availability`,
+        z.object({
+          available_plans: z.array(z.string()),
+        }),
+      ),
+      "Loading plans",
+    )
+  ).available_plans,
+});
+
+console.log("");
+
+const osId = await p.select({
+  message: "Select an operating system",
+  choices: (
+    await oraPromise(
+      sendRequest(
+        null,
+        "/v2/os",
+        z.object({
+          os: z.array(
+            z.object({
+              id: z.number(),
+              name: z.string(),
+              family: z.string(),
+              arch: z.string(),
+            }),
+          ),
+        }),
+      ),
+      "Loading operating systems",
+    )
+  ).os
+    .filter((os) => os.family === "ubuntu" || os.family === "debian")
+    .toSorted((left, right) => right.name.localeCompare(left.name))
+    .map((os) => ({
+      name: os.name,
+      value: os.id,
+    })),
+});
+
+console.log("");
+
+const publicDomain = await p.input({
+  message: "Public domain for HTTPS",
+  validate(value) {
+    return (
+      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+        value.trim().toLowerCase(),
+      ) || "Enter a valid public domain, like example.com"
+    );
+  },
+});
+
+console.log("");
 
 const sshAuthorizedKeys = await p.input({
   message: "SSH authorized keys (comma-separated)",
@@ -37,125 +138,9 @@ const sshAuthorizedKeys = await p.input({
   },
 });
 
-const publicDomain = await p.input({
-  message: "Public domain for HTTPS",
-  validate(value) {
-    return (
-      /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
-        value.trim().toLowerCase(),
-      ) || "Enter a valid public domain, like example.com"
-    );
-  },
-});
+console.log("");
 
-const apiKey = await p.password({
-  message: "Vultr API key",
-  mask: "*",
-  validate(value) {
-    return value.trim().length > 0 || "This value is required";
-  },
-});
-
-const regions = await sendRequest(
-  apiKey,
-  "/v2/regions?per_page=500",
-  z.object({
-    regions: z.array(
-      z.object({
-        id: z.string(),
-        city: z.string(),
-        country: z.string(),
-      }),
-    ),
-  }),
-);
-
-const region = await p.select({
-  message: "Select a Vultr region",
-  choices: regions.regions.map((region) => ({
-    name: `${region.city}, ${region.country} (${region.id})`,
-    value: region.id,
-  })),
-  pageSize: 15,
-});
-
-const [availability, plans, oses] = await Promise.all([
-  sendRequest(
-    apiKey,
-    `/v2/regions/${region}/availability`,
-    z.object({
-      available_plans: z.array(z.string()),
-    }),
-  ),
-  sendRequest(
-    apiKey,
-    "/v2/plans?per_page=500",
-    z.object({
-      plans: z.array(
-        z.object({
-          id: z.string(),
-          vcpu_count: z.number(),
-          ram: z.number(),
-          disk: z.number(),
-          bandwidth: z.number(),
-          monthly_cost: z.number(),
-          type: z.string(),
-          locations: z.array(z.string()),
-        }),
-      ),
-    }),
-  ),
-  sendRequest(
-    apiKey,
-    "/v2/os?per_page=500",
-    z.object({
-      os: z.array(
-        z.object({
-          id: z.number(),
-          name: z.string(),
-          family: z.string(),
-          arch: z.string(),
-        }),
-      ),
-    }),
-  ),
-]);
-
-const osId = await p.select({
-  message: "Select a Vultr operating system",
-  choices: oses.os
-    .filter((os) => os.family === "ubuntu" || os.family === "debian")
-    .toSorted((left, right) => right.name.localeCompare(left.name))
-    .map((os) => ({ name: os.name, value: os.id })),
-  pageSize: 15,
-});
-
-const availablePlanIds = new Set(availability.available_plans);
-
-const availablePlans = plans.plans
-  .filter(
-    (plan) => availablePlanIds.has(plan.id) && plan.locations.includes(region),
-  )
-  .sort(
-    (left, right) =>
-      left.monthly_cost - right.monthly_cost ||
-      left.vcpu_count - right.vcpu_count ||
-      left.ram - right.ram ||
-      left.id.localeCompare(right.id),
-  );
-
-const plan = await p.select({
-  message: "Select a Vultr plan",
-  choices: availablePlans.map((plan) => ({
-    name: `${plan.id} - ${plan.vcpu_count} vCPU, ${plan.ram} MB RAM, ${plan.disk} GB disk, $${
-      plan.monthly_cost
-    }/mo`,
-    value: plan.id,
-  })),
-  pageSize: 15,
-});
-
-let cloudConfig = fs.readFileSync(
+let cloudConfig = await fs.readFile(
   path.join(import.meta.dirname, "cloud-config.yaml"),
   "utf8",
 );
@@ -174,22 +159,37 @@ cloudConfig = cloudConfig.replace(
   publicDomain.trim().toLowerCase(),
 );
 
-const instance = await sendRequest(
-  apiKey,
-  "/v2/instances",
-  z.object({
-    instance: z.object({
-      id: z.string(),
-    }),
-  }),
-  {
-    region,
-    plan,
-    os_id: osId,
-    user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
+const apiKey = await p.password({
+  message: "Vultr API key",
+  mask: "*",
+  validate(value) {
+    return value.trim().length > 0 || "This value is required";
   },
+});
+
+console.log("");
+
+const instance = await oraPromise(
+  sendRequest(
+    apiKey,
+    "/v2/instances",
+    z.object({
+      instance: z.object({
+        id: z.string(),
+      }),
+    }),
+    {
+      region: regionId,
+      plan: planId,
+      os_id: osId,
+      user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
+    },
+  ),
+  "Creating instance",
 );
 
+console.log("");
+
 console.info(
-  `\nVultr instance created:\nhttps://console.vultr.com/subs/?id=${instance.instance.id}`,
+  `Instance created:\nhttps://console.vultr.com/subs/?id=${instance.instance.id}`,
 );

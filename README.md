@@ -86,11 +86,12 @@ npm run vultr
 
 The script will ask for:
 
-1. SSH authorized keys, comma-separated.
-2. The public domain Caddy should serve.
-3. Your Vultr API key.
-4. A Vultr region.
-5. A Vultr plan available in that region.
+1. A Vultr region.
+2. A Vultr plan available in that region.
+3. A Vultr Debian-based operating system.
+4. The public domain Caddy should serve.
+5. SSH authorized keys, comma-separated.
+6. Your Vultr API key.
 
 After you confirm the prompts, the script:
 
