@@ -114,9 +114,15 @@ After the instance is created:
 4. Set the DNS record proxy status to **Proxied**.
 5. Wait for DNS to propagate.
 
-The origin firewall accepts inbound `80/tcp` and `443/tcp` only from
-Cloudflare's published IPv4 and IPv6 ranges. Direct origin HTTP/HTTPS requests
-from non-Cloudflare IP addresses are blocked by UFW.
+During provisioning, cloud-init fetches Cloudflare's current IPv4 and IPv6
+ranges from `https://www.cloudflare.com/ips-v4` and
+`https://www.cloudflare.com/ips-v6`, then creates UFW allow rules for `80/tcp`
+and `443/tcp` from those ranges only. Direct origin HTTP/HTTPS requests from
+non-Cloudflare IP addresses are blocked by UFW.
+
+If the Cloudflare IP range fetch fails, the UFW setup command fails before
+running `ufw --force enable`. This keeps the origin from being opened with stale
+or incomplete HTTP/HTTPS allow rules.
 
 Caddy is configured for the domain you entered and forwards Cloudflare's
 `CF-Connecting-IP` value as `X-Forwarded-For`, so the Node.js app can receive
@@ -129,10 +135,6 @@ the origin certificate is not yet valid for strict verification. Use
 SSH remains direct. Use the server public IP address, or an unproxied DNS
 record, for `ssh deploy@...`. Cloudflare's normal proxied DNS records do not
 proxy SSH.
-
-Cloudflare IP ranges are hardcoded in `src/cloud-config.yaml`. Before
-provisioning a new server from an old checkout, compare them with
-`https://www.cloudflare.com/ips/`.
 
 ## Verify The Server
 
@@ -200,7 +202,7 @@ production secrets directly in `src/cloud-config.yaml`.
 Before using this as a production baseline, review:
 
 - whether the selected Ubuntu image in `src/vultr.ts` is the one you want
-- whether the hardcoded Cloudflare IP ranges are still current
+- whether your provisioning environment can reach Cloudflare's IP range endpoints
 - whether the app service should run your real app instead of the hello-world server
 - whether Litestream needs a real configuration and backup credentials
 - whether your DNS and HTTPS setup matches your edge provider
