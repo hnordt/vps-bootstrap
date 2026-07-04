@@ -29,7 +29,7 @@ users:
 
   - name: app
     system: true
-    groups: [app]
+    primary_group: app
     shell: /usr/sbin/nologin
     lock_passwd: true
 
