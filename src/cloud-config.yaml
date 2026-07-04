@@ -56,7 +56,7 @@ write_files:
       findtime = 10m
       bantime = 1h
 
-  - path: /etc/hello/.env
+  - path: /etc/app/.env
     owner: root:app
     permissions: "0640"
     defer: true
@@ -64,27 +64,71 @@ write_files:
       # Add app config and secrets as KEY=value lines.
       # Prefer injecting real secrets after provisioning.
 
-  - path: /opt/hello/server.js
+  - path: /opt/app/server.js
     owner: root:root
     permissions: "0644"
     content: |
       const http = require("http");
+      const path = require("path");
+      const { DatabaseSync } = require("node:sqlite");
 
       const host = "127.0.0.1";
       const port = 3000;
 
+      const db = new DatabaseSync(
+        path.join(process.env.STATE_DIRECTORY ?? ".", "app.db"),
+      );
+
+      db.exec("PRAGMA journal_mode = WAL");
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS visits (
+          id INTEGER PRIMARY KEY,
+          visited_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `);
+
+      const insertVisit = db.prepare("INSERT INTO visits DEFAULT VALUES");
+      const countVisits = db.prepare("SELECT count(*) AS count FROM visits");
+
       const server = http.createServer((request, response) => {
+        insertVisit.run();
+        const { count } = countVisits.get();
+
         response.writeHead(200, {
           "Content-Type": "text/plain; charset=utf-8",
         });
-        response.end("Hello world\n");
+        response.end(`Hello world\nVisits: ${count}\n`);
       });
 
       server.listen(port, host, () => {
         console.log(`Hello world server listening on http://${host}:${port}`);
       });
 
-  - path: /opt/hello/Caddyfile
+  - path: /etc/systemd/system/app.service
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Application server
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=app
+      WorkingDirectory=/opt/app
+      StateDirectory=app
+      EnvironmentFile=-/etc/app/.env
+      ExecStart=/usr/bin/node /opt/app/server.js
+      Restart=always
+      RestartSec=5
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /opt/app/Caddyfile
     owner: root:root
     permissions: "0644"
     content: |
@@ -105,29 +149,27 @@ write_files:
         }
       }
 
-  - path: /etc/systemd/system/hello-node.service
+  - path: /etc/litestream.yml
     owner: root:root
-    permissions: "0644"
+    permissions: "0600"
     content: |
-      [Unit]
-      Description=Node.js hello world server
-      Wants=network-online.target
-      After=network-online.target
+      dbs:
+        - path: /var/lib/app/app.db
+          replica:
+            type: file
+            path: /var/backups/app
 
-      [Service]
-      User=app
-      WorkingDirectory=/opt/hello
-      StateDirectory=hello
-      EnvironmentFile=-/etc/hello/.env
-      ExecStart=/usr/bin/node /opt/hello/server.js
-      Restart=always
-      RestartSec=5
-      NoNewPrivileges=true
-      ProtectSystem=strict
-      PrivateTmp=true
-
-      [Install]
-      WantedBy=multi-user.target
+      # Cloudflare R2 example
+      # dbs:
+      #   - path: /var/lib/app/app.db
+      #     replica:
+      #       type: s3
+      #       endpoint: https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com
+      #       region: auto
+      #       bucket: your-bucket
+      #       path: app
+      #       access-key-id: your-key-id
+      #       secret-access-key: your-secret
 
 runcmd:
   - set -eu
@@ -144,10 +186,10 @@ runcmd:
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
-  # Set up the Node.js service
+  # Set up the app service
   - |
     systemctl daemon-reload
-    systemctl enable --now hello-node
+    systemctl enable --now app
 
   # Set up Caddy
   - |
@@ -155,7 +197,7 @@ runcmd:
     curl -fsSL -o /etc/apt/sources.list.d/caddy-stable.list https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt
     apt-get update
     apt-get install -y caddy
-    install -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
+    install -m 0644 /opt/app/Caddyfile /etc/caddy/Caddyfile
     caddy validate --config /etc/caddy/Caddyfile
     systemctl restart caddy
 
