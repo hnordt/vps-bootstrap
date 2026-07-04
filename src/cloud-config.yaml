@@ -1,10 +1,8 @@
 #cloud-config
 
 # NOTE:
-# The target OS is Ubuntu 26.04 LTS, but this is expected to work on most
-# Debian-based distros.
-# If you copy this cloud-config manually, replace each ${{ ... }} placeholder
-# before provisioning.
+# This cloud-config targets Debian-based systems. If you copy it manually,
+# replace each ${{ ... }} placeholder before provisioning.
 
 ssh_pwauth: false
 disable_root: true
@@ -53,12 +51,22 @@ write_files:
     content: |
       [sshd]
       enabled = true
+
       backend = systemd
       banaction = ufw
       port = ssh
+
       maxretry = 5
       findtime = 10m
       bantime = 1h
+
+  - path: /etc/hello/.env
+    owner: root:app
+    permissions: "0640"
+    defer: true
+    content: |
+      # Add app config and secrets as KEY=value lines.
+      # Prefer injecting real secrets after provisioning.
 
   - path: /opt/hello/server.js
     owner: root:root
@@ -114,16 +122,16 @@ write_files:
     content: |
       [Unit]
       Description=Node.js hello world server
-      After=network-online.target
       Wants=network-online.target
+      After=network-online.target
 
       [Service]
       User=app
       WorkingDirectory=/opt/hello
+      EnvironmentFile=-/etc/hello/.env
       ExecStart=/usr/bin/node /opt/hello/server.js
       Restart=always
       RestartSec=5
-      Environment=NODE_ENV=production
 
       [Install]
       WantedBy=multi-user.target
