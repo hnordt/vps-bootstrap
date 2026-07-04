@@ -106,6 +106,9 @@ write_files:
       bantime = 1h
 
 runcmd:
+  # Enable automatic updates
+  - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
+
   # Configure UFW
   - ufw default deny incoming
   - ufw default allow outgoing
@@ -137,6 +140,3 @@ runcmd:
   - caddy validate --config /etc/caddy/Caddyfile
   - systemctl enable caddy
   - systemctl restart caddy
-
-  # Enable automatic updates
-  - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
