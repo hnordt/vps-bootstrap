@@ -146,11 +146,9 @@ runcmd:
     ufw limit 22/tcp
     ufw --force enable
 
-    cloudflare_ips="$(
-      curl -fsSL https://www.cloudflare.com/ips-v4
-      curl -fsSL https://www.cloudflare.com/ips-v6
-    )"
-    for range in $cloudflare_ips; do
+    ips_v4="$(curl -fsSL https://www.cloudflare.com/ips-v4)"
+    ips_v6="$(curl -fsSL https://www.cloudflare.com/ips-v6)"
+    for range in $ips_v4 $ips_v6; do
       ufw allow from "$range" to any port 80 proto tcp
       ufw allow from "$range" to any port 443 proto tcp
     done
