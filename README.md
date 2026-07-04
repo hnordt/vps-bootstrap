@@ -1,11 +1,12 @@
 # VPS Bootstrap
 
-Cloud-init setup for running a production-oriented Node.js server on a single VPS with Caddy-managed HTTPS.
+Cloud-init setup for running a production-oriented Node.js server on a single VPS behind Cloudflare.
 
 The default setup targets Ubuntu 24.04 LTS and includes:
 
 - Node.js
-- Caddy as the public HTTPS reverse proxy
+- Cloudflare as the public edge
+- Caddy as the origin HTTPS reverse proxy
 - systemd services for the application and Litestream
 - SQLite with WAL mode
 - UFW firewall rules
@@ -18,152 +19,30 @@ The default setup targets Ubuntu 24.04 LTS and includes:
 This repository provides a predictable baseline for a single-VPS deployment.
 
 ```txt
-browser -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
+browser -> Cloudflare edge -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
 ```
 
-The application should listen on `127.0.0.1`. Caddy is the public HTTP and HTTPS entrypoint and manages certificates automatically.
+The application should listen on `127.0.0.1`. Cloudflare should be the public HTTP entrypoint, and Caddy should only accept HTTPS from Cloudflare IP ranges.
 
-The cloud-config file is the source of truth for the baseline users, packages, systemd units, firewall, and hardening. Site-specific SSH, domain, and backup settings are installed after first boot so the cloud-config can be copied unchanged.
+The cloud-config file is the source of truth for the generated systemd units and Caddy configuration.
 
-## Vultr Deployment
-
-The quickest path is the Vultr provisioning script. It creates the VPS, passes `cloud-config.yaml` as cloud-init user data, waits for the server to finish bootstrapping, uploads the site-specific files, restores or creates the SQLite database, and starts Caddy and Litestream.
-
-DNS is intentionally out of scope for now. The script prints the new Vultr IPv4 address and waits for your domain's `A` record to point at it before starting Caddy, so Caddy can request certificates automatically.
-
-Requirements:
-
-- Node.js 18 or newer on your local machine.
-- `ssh` and `scp` available locally.
-- A Vultr API key in `VULTR_API_KEY`.
-- A local SSH key pair for server access.
-- DNS control for your app hostname.
-
-Create a private config file:
-
-```bash
-cp deploy.config.example.json deploy.config.json
-```
-
-Edit `deploy.config.json` with your Vultr region, plan, OS choice, domain, SSH key paths, ACME email, and Litestream object storage settings.
-
-Run the deployer:
-
-```bash
-VULTR_API_KEY=your-vultr-api-key node scripts/provision-vultr.mjs
-```
-
-The script writes `.vps-bootstrap-state.json` after creating resources so a repeated run continues against the same instance instead of creating another VPS.
-
-After the script finishes, deploy your Node app into `/opt/app/current` and start the app service:
-
-```bash
-ssh deploy@YOUR_SERVER_IP
-sudo systemctl start app
-```
-
-## Manual Deployment Setup
+## Deployment Setup
 
 Use `cloud-config.yaml` with any VPS provider that supports cloud-init user data, such as Vultr, DigitalOcean, Hetzner, Linode, AWS Lightsail, or another Ubuntu VPS host.
 
 1. Choose an Ubuntu 24.04 LTS image.
 2. Choose a region close to your users.
-3. Add your SSH public key through the VPS provider's normal SSH key setting.
-4. Create the VPS and paste the full contents of `cloud-config.yaml`, starting with `#cloud-config`, into the provider's cloud-init or user data field without editing it.
-5. Copy the VPS public IPv4 address from the provider console.
-6. Wait for cloud-init to finish, then connect as the provider-created user, such as `ubuntu` or `root`.
+3. Create a Cloudflare Origin Certificate for the app hostname you will use as `__DOMAIN__`.
+4. Replace every placeholder value in `cloud-config.yaml`, including the SSH public key, Cloudflare certificate, and object storage settings.
+5. Create the VPS and paste the full contents of `cloud-config.yaml`, starting with `#cloud-config`, into the provider's cloud-init or user data field.
+6. Copy the VPS public IPv4 address from the provider console.
+7. In Cloudflare, create a proxied `A` record for `__DOMAIN__` pointing to the VPS public IPv4 address.
+8. Set Cloudflare SSL/TLS mode to `Full (strict)`.
+9. Wait for cloud-init to finish, then connect as the `deploy` user and verify the services.
 
 ```bash
-ssh ubuntu@YOUR_SERVER_IP
+ssh deploy@YOUR_SERVER_IP
 cloud-init status --long
-```
-
-The template creates a `deploy` user but does not embed an SSH key in user data. After first login, copy the provider-installed authorized keys into the `deploy` account:
-
-```bash
-sudo install -d -o deploy -g app -m 0700 /home/deploy/.ssh
-sudo install -o deploy -g app -m 0600 ~/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
-```
-
-Reconnect as `deploy`, then disable root SSH login:
-
-```bash
-ssh deploy@YOUR_SERVER_IP
-
-printf '%s\n' 'PermitRootLogin no' 'PasswordAuthentication no' \
-  | sudo tee /etc/ssh/sshd_config.d/99-vps-bootstrap.conf >/dev/null
-sudo systemctl reload ssh || sudo systemctl reload sshd
-```
-
-Caddy and Litestream are installed during cloud-init, but they are intentionally left idle until the site-specific files are installed.
-
-Create an `A` record for the app hostname pointing to the VPS public IPv4 address. Caddy uses that DNS record to request and renew certificates automatically.
-
-From your local machine, create these files:
-
-- `Caddyfile`: Caddy site configuration for your domain.
-- `litestream.yml`: Litestream object storage configuration.
-
-Example `Caddyfile`:
-
-```caddyfile
-{
-  admin off
-}
-
-app.example.com {
-  encode zstd gzip
-  reverse_proxy 127.0.0.1:3000
-}
-```
-
-Example `litestream.yml`:
-
-```yaml
-dbs:
-  - path: /var/lib/app/data.db
-    replica:
-      type: s3
-      endpoint: YOUR_S3_ENDPOINT
-      region: YOUR_S3_REGION
-      bucket: YOUR_S3_BUCKET
-      path: data.db
-      access-key-id: YOUR_S3_ACCESS_KEY_ID
-      secret-access-key: YOUR_S3_SECRET_ACCESS_KEY
-```
-
-Upload the files to a private staging directory:
-
-```bash
-ssh deploy@YOUR_SERVER_IP 'install -d -m 0700 ~/secret-upload'
-scp ./Caddyfile ./litestream.yml deploy@YOUR_SERVER_IP:~/secret-upload/
-```
-
-Install them with the ownership and permissions expected by the systemd services:
-
-```bash
-ssh deploy@YOUR_SERVER_IP
-
-sudo install -o root -g root -m 0644 ~/secret-upload/Caddyfile /etc/caddy/Caddyfile
-sudo install -o root -g litestream -m 0640 ~/secret-upload/litestream.yml /etc/litestream.yml
-rm -rf ~/secret-upload
-
-sudo -u litestream litestream restore \
-  -config /etc/litestream.yml \
-  -if-db-not-exists \
-  -if-replica-exists \
-  /var/lib/app/data.db || true
-sudo test -f /var/lib/app/data.db || sudo -u app sqlite3 /var/lib/app/data.db "PRAGMA journal_mode=WAL;"
-sudo chown app:app /var/lib/app/data.db*
-sudo chmod 0660 /var/lib/app/data.db*
-
-sudo systemctl enable --now caddy
-sudo systemctl enable --now litestream
-```
-
-Verify the server:
-
-```bash
 sudo ufw status verbose
 sudo systemctl status app
 sudo systemctl status caddy
@@ -171,11 +50,29 @@ sudo systemctl status litestream
 curl -I https://app.example.com/health
 ```
 
-This setup expects Caddy to be the public entrypoint for your domain.
+This setup expects Cloudflare to be the public entrypoint for your domain. The VPS still serves HTTPS with Caddy, but only Cloudflare IP ranges should be able to reach it.
 
-The VPS firewall allows SSH, HTTP, and HTTPS. Port 80 is required for Caddy's default HTTP-01 certificate challenge.
+The VPS firewall allows SSH and allows HTTPS only from Cloudflare IP ranges.
 
-Caddy handles HTTP to HTTPS redirects and certificate renewal.
+Cloudflare Origin Certificates secure the connection between Cloudflare and the origin server. They are compatible with Full (strict) mode, but they are not browser-trusted certificates if someone bypasses Cloudflare and connects directly to the origin.
+
+The template keeps port 80 closed. Cloudflare can handle HTTP to HTTPS redirects at the edge.
+
+The template syncs Cloudflare IP ranges into UFW at boot and then weekly through a systemd timer.
+
+Because traffic reaches your VPS from Cloudflare, the app must read the real client IP from `CF-Connecting-IP`; the direct peer address will be a Cloudflare address.
+
+Placeholder reference:
+
+- `__SSH_PUBLIC_KEY__`: The SSH public key allowed to log in as the `deploy` user. Use the public half of your key, such as the contents of `~/.ssh/id_ed25519.pub`.
+- `__DOMAIN__`: The app hostname Caddy serves, such as `app.example.com`. This should match the proxied Cloudflare DNS record and Origin Certificate hostname.
+- `__CLOUDFLARE_ORIGIN_CERT_PEM__`: The Cloudflare Origin Certificate PEM for `__DOMAIN__`. Caddy uses this certificate for HTTPS between Cloudflare and the VPS.
+- `__CLOUDFLARE_ORIGIN_KEY_PEM__`: The private key paired with the Cloudflare Origin Certificate. Keep it secret.
+- `__S3_ENDPOINT__`: The S3-compatible object storage endpoint used by Litestream, such as a regional S3, R2, Spaces, or Object Storage endpoint.
+- `__S3_REGION__`: The object storage region expected by the S3-compatible API.
+- `__S3_BUCKET__`: The bucket where Litestream stores SQLite backup snapshots and WAL segments.
+- `__S3_ACCESS_KEY_ID__`: The access key Litestream uses to write to the backup bucket.
+- `__S3_SECRET_ACCESS_KEY__`: The secret key paired with `__S3_ACCESS_KEY_ID__`. Keep it secret and scope it to the backup bucket or path.
 
 ## Secrets
 
@@ -183,14 +80,14 @@ Do not commit real credentials.
 
 Do not place production long-lived secrets directly in cloud-init user data when you can avoid it. User data may be retained by the VPS provider and may be readable from inside the instance through the provider metadata service, not only by `root`.
 
-The cloud-config file intentionally contains no site-specific secrets. Upload final secret-backed files over SSH after the server boots.
+For production, prefer this flow:
 
-For production:
-
-1. Store backup credentials in `/etc/litestream.yml`, readable by `root:litestream`.
-2. Keep the application user unable to read backup credentials.
-3. Use object storage credentials scoped to the one backup bucket or path.
-4. Enable bucket versioning. Use object lock if you need stronger protection against destructive backup deletion.
+1. Deploy with placeholder or temporary credentials.
+2. Upload final secret files over SSH after the server boots.
+3. Store backup credentials in files readable only by the `litestream` user or group.
+4. Keep the application user unable to read backup credentials.
+5. Use object storage credentials scoped to the one backup bucket or path.
+6. Enable bucket versioning. Use object lock if you need stronger protection against destructive backup deletion.
 
 ## Litestream
 
@@ -299,14 +196,14 @@ Firewall:
 - [ ] UFW is enabled.
 - [ ] Default incoming policy is deny.
 - [ ] Default outgoing policy is allow.
-- [ ] Only `22/tcp`, `80/tcp`, and `443/tcp` are open.
-- [ ] Optional: SSH is restricted to known IP addresses.
+- [ ] Only `22/tcp` and Cloudflare-sourced `443/tcp` are open.
+- [ ] Cloudflare IP sync fetches and validates the new list before deleting existing allow rules.
 
 Application boundary:
 
 - [ ] The Node app binds to `127.0.0.1`, not `0.0.0.0`.
-- [ ] Caddy is the public HTTP and HTTPS entrypoint.
-- [ ] Caddy certificates are issuing and renewing successfully.
+- [ ] Cloudflare is the public HTTP entrypoint.
+- [ ] Caddy only accepts HTTPS from Cloudflare IP ranges.
 - [ ] The database is stored under `/var/lib/app`.
 - [ ] Application code is stored outside writable application state.
 - [ ] The app does not run as root.
