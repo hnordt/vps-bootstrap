@@ -174,10 +174,30 @@ runcmd:
   - |
     set -eu
 
-    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
-    dpkg -i /run/litestream.deb
+    litestream_version="0.5.8"
+    debian_arch="$(dpkg --print-architecture)"
+    case "${debian_arch}" in
+      amd64)
+        litestream_arch="x86_64"
+        litestream_sha256="854ed88ce4c30da887e7c099ffb2941bae2f7108db89886e7ec5ee80c81356b7"
+        ;;
+      arm64)
+        litestream_arch="arm64"
+        litestream_sha256="bc92d95bc8203a41afe9b5df552aafe1bc0781c6b4341d52970e3f1cd7220c8d"
+        ;;
+      *)
+        echo "Unsupported Litestream architecture: ${debian_arch}" >&2
+        exit 1
+        ;;
+    esac
 
-    systemctl enable --now litestream
+    litestream_deb="litestream-${litestream_version}-linux-${litestream_arch}.deb"
+    curl -fsSL -o "/run/${litestream_deb}" "https://github.com/benbjohnson/litestream/releases/download/v${litestream_version}/${litestream_deb}"
+    printf '%s  %s\n' "${litestream_sha256}" "/run/${litestream_deb}" | sha256sum -c -
+
+    dpkg -i "/run/${litestream_deb}"
+
+    systemctl disable --now litestream
 
   # Set up the Node.js service
   - |

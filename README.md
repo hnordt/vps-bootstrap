@@ -30,7 +30,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`
 - a root-owned app environment file at `/etc/hello/.env`
 - Caddy as the public reverse proxy, configured with baseline HTTP security headers
-- Litestream installed from its Debian package
+- Litestream installed from a SHA-256-verified Debian package, left disabled until configured
 
 The resulting app path is:
 
@@ -242,7 +242,7 @@ Common changes:
 - Replace `hello-node.service` with your production systemd service.
 - Change `/opt/hello/Caddyfile` for routing, headers, or additional domains.
 - Adjust UFW rules if the server should only accept traffic from a trusted edge.
-- Configure Litestream before relying on it for backups.
+- Configure Litestream replicas, then enable and start `litestream.service` before relying on it for backups.
 
 To change Vultr-specific defaults, edit `src/vultr.ts`.
 
