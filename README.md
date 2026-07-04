@@ -28,6 +28,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`
+- a root-owned app environment file at `/etc/hello/.env`
 - Caddy as the public reverse proxy, configured with baseline HTTP security headers
 - Litestream installed from its Debian package
 
@@ -100,6 +101,34 @@ After you confirm the prompts, the script:
 5. Prints a Vultr Console URL for the new instance.
 
 The rendered cloud-config is sent to Vultr; it is not written to a local file.
+
+## App Config And Secrets
+
+The `hello-node` systemd service loads environment variables from `/etc/hello/.env` at startup.
+
+This env file is created by cloud-init and required by the service. If it is
+missing, unreadable, or invalid, `hello-node` will fail to start. Values in
+`/etc/hello/.env` should use systemd environment-file syntax:
+
+```ini
+DATABASE_URL=postgres://user:password@example.internal/app
+SESSION_SECRET=replace-me
+```
+
+The file is written as `root:app` with `0640` permissions. That lets the app
+service read it while keeping it unavailable to normal users. To change values
+after provisioning, edit the file as root and restart the service:
+
+```bash
+sudoedit /etc/hello/.env
+sudo systemctl restart hello-node
+```
+
+Do not commit real secrets to `src/cloud-config.yaml`. Cloud-init user data is
+sent to the VPS provider, may be retained by the provider, and can be read from
+inside the instance by privileged users. Prefer adding production secrets after
+the instance is created, or inject them through a provider secret mechanism if
+your deployment target supports one.
 
 ## DNS
 
@@ -226,8 +255,8 @@ The SSH public keys and domain are embedded in the cloud-init user data sent to
 Vultr.
 
 Cloud-init user data may be retained by the VPS provider and may be readable
-from inside the instance by privileged users. Avoid putting long-lived
-production secrets directly in `src/cloud-config.yaml`.
+from inside the instance by privileged users. See [App Config And Secrets](#app-config-and-secrets)
+before adding long-lived production secrets.
 
 Before using this as a production baseline, review:
 
