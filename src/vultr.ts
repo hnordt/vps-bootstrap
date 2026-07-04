@@ -11,7 +11,7 @@ const OS = {
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
   pathname: string,
-  schema: T,
+  responseSchema: T,
   body?: Record<string, any>,
 ) {
   const response = await fetch(new URL(pathname, "https://api.vultr.com"), {
@@ -27,7 +27,7 @@ async function sendRequest<T extends z.ZodTypeAny>(
     throw await response.json();
   }
 
-  return schema.parse(await response.json());
+  return responseSchema.parse(await response.json());
 }
 
 const sshAuthorizedKeys = await p.input({
