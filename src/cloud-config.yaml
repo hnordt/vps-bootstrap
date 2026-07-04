@@ -120,16 +120,13 @@ write_files:
       [Service]
       User=app
       WorkingDirectory=/opt/app
-      EnvironmentFile=-/etc/app/.env
       UMask=0077
-
       StateDirectory=app
       StateDirectoryMode=0700
-
+      EnvironmentFile=-/etc/app/.env
       ExecStart=/usr/bin/node /opt/app/server.js
       Restart=always
       RestartSec=5
-
       NoNewPrivileges=true
       ProtectSystem=strict
       PrivateTmp=true
@@ -137,7 +134,7 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
-  - path: /opt/app/Caddyfile
+  - path: /run/Caddyfile
     owner: root:root
     permissions: "0644"
     content: |
@@ -158,7 +155,7 @@ write_files:
         }
       }
 
-  - path: /opt/app/litestream.yml
+  - path: /run/litestream.yml
     owner: root:root
     permissions: "0600"
     content: |
@@ -206,7 +203,7 @@ runcmd:
     curl -fsSL -o /etc/apt/sources.list.d/caddy-stable.list https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt
     apt-get update
     apt-get install -y caddy
-    install -m 0644 /opt/app/Caddyfile /etc/caddy/Caddyfile
+    install -m 0644 /run/Caddyfile /etc/caddy/Caddyfile
     caddy validate --config /etc/caddy/Caddyfile
     systemctl restart caddy
 
@@ -214,7 +211,7 @@ runcmd:
   - |
     curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
     apt-get install -y /run/litestream.deb
-    install -m 0600 /opt/app/litestream.yml /etc/litestream.yml
+    install -m 0600 /run/litestream.yml /etc/litestream.yml
     systemctl enable litestream
     systemctl restart litestream
 

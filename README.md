@@ -398,7 +398,7 @@ Common changes:
 - Replace `/opt/app/server.js` with your application bootstrap.
 - Adjust `ExecStart` in `app.service` if your deploy ships something other
   than `node server.js`, such as a compiled binary.
-- Change `/opt/app/Caddyfile` for routing, headers, or additional domains.
+- Change `/etc/caddy/Caddyfile` for routing, headers, or additional domains.
 - Adjust UFW rules if the server should only accept traffic from a trusted edge.
 - Change `/etc/litestream.yml` if your app uses a different database path or
   needs provider-specific replica settings.
