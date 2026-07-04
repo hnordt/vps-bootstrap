@@ -11,6 +11,7 @@ packages:
   - curl
   - debian-archive-keyring
   - debian-keyring
+  - fail2ban
   - gpg
   - nodejs
   - unattended-upgrades
@@ -40,12 +41,28 @@ write_files:
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
 
+  - path: /etc/fail2ban/jail.d/sshd.local
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      banaction = ufw
+      port = ssh
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+
 runcmd:
   # Configure UFW
   - ufw default deny incoming
   - ufw default allow outgoing
   - ufw limit 22/tcp comment "SSH"
   - ufw --force enable
+
+  # Enable SSH brute-force protection
+  - systemctl enable --now fail2ban
 
   # Install Caddy
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
