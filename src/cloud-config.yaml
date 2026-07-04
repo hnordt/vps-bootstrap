@@ -129,20 +129,22 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
+  - set -eu
+
   # Set up UFW
   - |
-    set -eu
-
     ufw default deny incoming
     ufw default allow outgoing
     ufw limit 22/tcp
 
-    for range in $(curl -fsSL https://www.cloudflare.com/ips-v4); do
+    cloudflare_ipv4="$(curl -fsSL https://www.cloudflare.com/ips-v4)"
+    for range in $cloudflare_ipv4; do
       ufw allow from "$range" to any port 80 proto tcp
       ufw allow from "$range" to any port 443 proto tcp
     done
 
-    for range in $(curl -fsSL https://www.cloudflare.com/ips-v6); do
+    cloudflare_ipv6="$(curl -fsSL https://www.cloudflare.com/ips-v6)"
+    for range in $cloudflare_ipv6; do
       ufw allow from "$range" to any port 80 proto tcp
       ufw allow from "$range" to any port 443 proto tcp
     done
@@ -150,7 +152,8 @@ runcmd:
     ufw --force enable
 
   # Set up Caddy
-  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf -o /run/caddy-stable-gpg.key 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key'
+  - gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg /run/caddy-stable-gpg.key
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
   - chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - chmod o+r /etc/apt/sources.list.d/caddy-stable.list
@@ -158,8 +161,8 @@ runcmd:
   - apt-get install -y caddy
 
   # Set up Litestream
-  - curl -L -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
-  - dpkg -i /tmp/litestream.deb
+  - curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
+  - dpkg -i /run/litestream.deb
   - systemctl enable --now litestream
 
   # Set up the Node.js app behind Caddy
