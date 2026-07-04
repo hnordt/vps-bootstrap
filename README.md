@@ -33,7 +33,7 @@ Use `cloud-config.yaml` with any VPS provider that supports cloud-init user data
 1. Choose an Ubuntu 24.04 LTS image.
 2. Choose a region close to your users.
 3. Create a Cloudflare Origin Certificate for the app hostname you will use as `__DOMAIN__`.
-4. Replace every placeholder value in `cloud-config.yaml`, including the SSH public key, Cloudflare certificate, object storage settings, and Litestream checksums.
+4. Replace every placeholder value in `cloud-config.yaml`, including the SSH public key, Cloudflare certificate, and object storage settings.
 5. Create the VPS and paste the full contents of `cloud-config.yaml`, starting with `#cloud-config`, into the provider's cloud-init or user data field.
 6. Copy the VPS public IPv4 address from the provider console.
 7. In Cloudflare, create a proxied `A` record for `__DOMAIN__` pointing to the VPS public IPv4 address.
@@ -73,8 +73,6 @@ Placeholder reference:
 - `__S3_BUCKET__`: The bucket where Litestream stores SQLite backup snapshots and WAL segments.
 - `__S3_ACCESS_KEY_ID__`: The access key Litestream uses to write to the backup bucket.
 - `__S3_SECRET_ACCESS_KEY__`: The secret key paired with `__S3_ACCESS_KEY_ID__`. Keep it secret and scope it to the backup bucket or path.
-- `__LITESTREAM_SHA256_AMD64__`: The SHA256 checksum for the pinned Litestream Linux `amd64` release archive.
-- `__LITESTREAM_SHA256_ARM64__`: The SHA256 checksum for the pinned Litestream Linux `arm64` release archive.
 
 ## Secrets
 
@@ -97,43 +95,39 @@ Litestream 0.5 uses a single `replica` field in the configuration file.
 
 The template uses the v0.5 configuration shape and pins the Litestream release URL to `v0.5.13`.
 
-The template requires architecture-specific SHA256 placeholders to be replaced before deployment:
+The installer automatically downloads the matching GitHub release archive and the release `checksums.txt` file, then verifies the archive before extracting it as `root`.
 
-```txt
-__LITESTREAM_SHA256_AMD64__
-__LITESTREAM_SHA256_ARM64__
-```
-
-This makes provisioning deterministic and prevents running a dynamically selected GitHub release as `root` without integrity verification.
+Security notice: this removes the manual checksum step while still detecting corrupted or mismatched downloads. It is less strict than storing the expected SHA256 in this repository, because the archive and checksum file are both fetched from the same GitHub release during provisioning. If you need stronger supply-chain control, vendor the expected checksum in `cloud-config.yaml` or install Litestream from a trusted internal package mirror.
 
 When upgrading Litestream:
 
 1. Choose the new release version.
 2. Update `LITESTREAM_VERSION` in `cloud-config.yaml`.
-3. Download the release artifacts for each target architecture.
-4. Compute the SHA256 checksum for each artifact.
-5. Replace the checksum placeholders in the deployed template.
-6. Test restore and replication on a disposable VPS before using the new version in production.
+3. Confirm the release includes a `checksums.txt` asset and Linux archive for each target architecture.
+4. Test restore and replication on a disposable VPS before using the new version in production.
 
-For disposable manual testing, this snippet installs the latest Litestream release for the current architecture. Production provisioning should use the pinned version and SHA256 verification in `cloud-config.yaml`.
+For disposable manual testing, this snippet installs the latest Litestream release for the current architecture and verifies it against the release checksum file. Production provisioning should use the pinned version in `cloud-config.yaml`.
 
 ```bash
 ARCH="$(dpkg --print-architecture)"
 case "$ARCH" in
-  amd64) LITESTREAM_ARCH="amd64" ;;
+  amd64) LITESTREAM_ARCH="x86_64" ;;
   arm64) LITESTREAM_ARCH="arm64" ;;
   *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
 esac
 
-LITESTREAM_URL="$(
-  curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest \
-    | jq -r ".assets[] | select(.name | test(\"linux-${LITESTREAM_ARCH}.*tar.gz$\")) | .browser_download_url" \
-    | head -n 1
-)"
+release_json="$(curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest)"
+LITESTREAM_VERSION="$(printf '%s' "$release_json" | jq -r .tag_name)"
+LITESTREAM_FILE="litestream-${LITESTREAM_VERSION#v}-linux-${LITESTREAM_ARCH}.tar.gz"
+LITESTREAM_BASE_URL="https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}"
 
-test -n "$LITESTREAM_URL"
-curl -fsSL "$LITESTREAM_URL" -o /tmp/litestream.tar.gz
-tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+curl -fsSL "${LITESTREAM_BASE_URL}/${LITESTREAM_FILE}" -o "${tmp}/${LITESTREAM_FILE}"
+curl -fsSL "${LITESTREAM_BASE_URL}/checksums.txt" -o "${tmp}/checksums.txt"
+cd "$tmp"
+grep -F "  ${LITESTREAM_FILE}" checksums.txt | sha256sum -c -
+tar -xzf "${LITESTREAM_FILE}" -C /usr/local/bin litestream
 chmod 0755 /usr/local/bin/litestream
 ```
 
@@ -230,8 +224,8 @@ Backups:
 Supply chain:
 
 - [ ] Litestream version is pinned.
-- [ ] Litestream release archives are verified with SHA256 before extraction.
-- [ ] SHA256 placeholders are replaced before deployment.
+- [ ] Litestream release archive is verified against the pinned release `checksums.txt` before extraction.
+- [ ] You accept the GitHub release checksum trust model, or you vendor the expected SHA256 for stricter supply-chain control.
 
 Operations:
 
