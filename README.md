@@ -63,7 +63,7 @@ Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
 
 ## Prerequisites
 
-- Node.js v22+.
+- Node.js v22.18.0+.
 - npm.
 - A Vultr API key with permission to create instances.
 - One or more SSH public keys, such as the contents of `~/.ssh/id_ed25519.pub`.
