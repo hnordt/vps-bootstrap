@@ -63,7 +63,7 @@ Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
 
 ## Prerequisites
 
-- Node.js with support for `--experimental-strip-types` available in `node`.
+- Node.js v22+.
 - npm.
 - A Vultr API key with permission to create instances.
 - One or more SSH public keys, such as the contents of `~/.ssh/id_ed25519.pub`.

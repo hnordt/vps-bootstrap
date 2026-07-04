@@ -1,10 +1,8 @@
 {
   "compilerOptions": {
     "module": "nodenext",
-    "noEmit": true,
-    "strict": true,
-    "target": "esnext",
-    "types": ["node"]
-  },
-  "include": ["src/**/*.ts"]
+    "types": ["node"],
+    "erasableSyntaxOnly": true,
+    "noEmit": true
+  }
 }
