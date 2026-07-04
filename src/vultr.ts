@@ -1,7 +1,16 @@
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
 import * as z from "zod";
+import { oraPromise } from "ora";
 import * as p from "@inquirer/prompts";
+
+process.on("uncaughtException", (error) => {
+  if (error instanceof Error && error.name === "ExitPromptError") {
+    return;
+  }
+
+  throw error;
+});
 
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string | null,
@@ -26,20 +35,26 @@ async function sendRequest<T extends z.ZodTypeAny>(
 }
 
 const regionId = await p.select({
-  message: "Select a Vultr region",
+  message: "Select a region",
   choices: (
-    await sendRequest(
-      null,
-      "/v2/regions",
-      z.object({
-        regions: z.array(
-          z.object({
-            id: z.string(),
-            city: z.string(),
-            country: z.string(),
-          }),
-        ),
-      }),
+    await oraPromise(
+      sendRequest(
+        null,
+        "/v2/regions",
+        z.object({
+          regions: z.array(
+            z.object({
+              id: z.string(),
+              city: z.string(),
+              country: z.string(),
+            }),
+          ),
+        }),
+      ),
+      {
+        text: "Loading regions",
+        color: "red",
+      },
     )
   ).regions.map((region) => ({
     name: `${region.city}, ${region.country} (${region.id})`,
@@ -47,35 +62,45 @@ const regionId = await p.select({
   })),
 });
 
+console.log("");
+
 const planId = await p.select({
-  message: "Select a Vultr plan",
+  message: "Select a plan",
   choices: (
-    await sendRequest(
-      null,
-      `/v2/regions/${regionId}/availability`,
-      z.object({
-        available_plans: z.array(z.string()),
-      }),
+    await oraPromise(
+      sendRequest(
+        null,
+        `/v2/regions/${regionId}/availability`,
+        z.object({
+          available_plans: z.array(z.string()),
+        }),
+      ),
+      "Loading plans",
     )
   ).available_plans,
 });
 
+console.log("");
+
 const osId = await p.select({
-  message: "Select a Vultr operating system",
+  message: "Select an operating system",
   choices: (
-    await sendRequest(
-      null,
-      "/v2/os",
-      z.object({
-        os: z.array(
-          z.object({
-            id: z.number(),
-            name: z.string(),
-            family: z.string(),
-            arch: z.string(),
-          }),
-        ),
-      }),
+    await oraPromise(
+      sendRequest(
+        null,
+        "/v2/os",
+        z.object({
+          os: z.array(
+            z.object({
+              id: z.number(),
+              name: z.string(),
+              family: z.string(),
+              arch: z.string(),
+            }),
+          ),
+        }),
+      ),
+      "Loading operating systems",
     )
   ).os
     .filter((os) => os.family === "ubuntu" || os.family === "debian")
@@ -85,6 +110,8 @@ const osId = await p.select({
       value: os.id,
     })),
 });
+
+console.log("");
 
 const publicDomain = await p.input({
   message: "Public domain for HTTPS",
@@ -97,6 +124,8 @@ const publicDomain = await p.input({
   },
 });
 
+console.log("");
+
 const sshAuthorizedKeys = await p.input({
   message: "SSH authorized keys (comma-separated)",
   validate(value) {
@@ -108,6 +137,8 @@ const sshAuthorizedKeys = await p.input({
     );
   },
 });
+
+console.log("");
 
 let cloudConfig = await fs.readFile(
   path.join(import.meta.dirname, "cloud-config.yaml"),
@@ -136,22 +167,29 @@ const apiKey = await p.password({
   },
 });
 
-const instance = await sendRequest(
-  apiKey,
-  "/v2/instances",
-  z.object({
-    instance: z.object({
-      id: z.string(),
+console.log("");
+
+const instance = await oraPromise(
+  sendRequest(
+    apiKey,
+    "/v2/instances",
+    z.object({
+      instance: z.object({
+        id: z.string(),
+      }),
     }),
-  }),
-  {
-    region: regionId,
-    plan: planId,
-    os_id: osId,
-    user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
-  },
+    {
+      region: regionId,
+      plan: planId,
+      os_id: osId,
+      user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
+    },
+  ),
+  "Creating instance",
 );
 
+console.log("");
+
 console.info(
-  `\nVultr instance created:\nhttps://console.vultr.com/subs/?id=${instance.instance.id}`,
+  `Instance created:\nhttps://console.vultr.com/subs/?id=${instance.instance.id}`,
 );
