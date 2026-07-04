@@ -26,7 +26,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - unattended package upgrades
 - UFW firewall rules for SSH and Cloudflare-proxied HTTP/HTTPS
 - fail2ban for SSH protection
-- Node.js 22 from the NodeSource apt repository
+- Node.js from the Ubuntu package repositories
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`, backed by a
   SQLite database created with the built-in `node:sqlite` module
 - a root-owned app environment file at `/etc/app/.env`
@@ -143,9 +143,7 @@ your deployment target supports one.
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
 module, so no npm dependencies are needed. `node:sqlite` requires Node.js
-v22.13.0 or newer, so provisioning installs Node.js 22 from the NodeSource apt
-repository instead of the distribution `nodejs` package — several of the
-Debian-based images offered by the OS selector still ship Node.js 18.
+v22.13.0 or newer, which the Ubuntu 26.04 `nodejs` package satisfies.
 
 The database lives at `/var/lib/app/app.db`. The `app` service uses
 `StateDirectory=app`, so systemd creates `/var/lib/app` owned by the `app`
