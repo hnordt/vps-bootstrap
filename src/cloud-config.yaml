@@ -68,9 +68,9 @@ write_files:
     owner: root:root
     permissions: "0644"
     content: |
-      const http = require("http");
-      const path = require("path");
-      const { DatabaseSync } = require("node:sqlite");
+      import * as http from "node:http";
+      import * as path from "node:path";
+      import { DatabaseSync } from "node:sqlite";
 
       const host = "127.0.0.1";
       const port = 3000;
@@ -80,6 +80,10 @@ write_files:
       );
 
       db.exec("PRAGMA journal_mode = WAL");
+      db.exec("PRAGMA synchronous = NORMAL");
+      db.exec("PRAGMA busy_timeout = 5000");
+      db.exec("PRAGMA foreign_keys = ON");
+
       db.exec(`
         CREATE TABLE IF NOT EXISTS visits (
           id INTEGER PRIMARY KEY,
@@ -97,11 +101,11 @@ write_files:
         response.writeHead(200, {
           "Content-Type": "text/plain; charset=utf-8",
         });
-        response.end(`Hello world\nVisits: ${count}\n`);
+        response.end(`Visits: ${count}\n`);
       });
 
       server.listen(port, host, () => {
-        console.log(`Hello world server listening on http://${host}:${port}`);
+        console.log(`Server listening on http://${host}:${port}`);
       });
 
   - path: /etc/systemd/system/app.service
