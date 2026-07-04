@@ -3,6 +3,9 @@
   "scripts": {
     "start": "node --experimental-strip-types ./src/cli.ts"
   },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
   "devDependencies": {
     "@types/node": "^26.1.0"
   }

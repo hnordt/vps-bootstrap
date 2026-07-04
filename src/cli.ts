@@ -1,18 +1,40 @@
-import { stdin, stdout } from "node:process";
-import { createInterface } from "node:readline/promises";
+import { Command, InvalidArgumentError } from "commander";
 
-const rl = createInterface({ input: stdin, output: stdout });
+type Options = {
+  vultrApiKey: string;
+  sshAuthorizedKeys: string;
+  label?: string;
+  region: string;
+  plan: string;
+  osId: number;
+};
 
-const vultrApiKey =
-  process.env.VULTR_API_KEY || (await rl.question("Vultr API Key: "));
+const parseInteger = (value: string) => {
+  const parsed = Number(value);
 
-const sshAuthorizedKeys =
-  process.env.SSH_AUTHORIZED_KEYS ||
-  (await rl.question("SSH Authorized Keys (comma-separated): "));
+  if (!Number.isInteger(parsed)) {
+    throw new InvalidArgumentError(`expected an integer, received "${value}"`);
+  }
 
-const vpsLabel =
-  (process.env.VPS_LABEL || (await rl.question("VPS Label: "))) ??
-  `VPS ${new Date().toISOString()}`;
+  return parsed;
+};
+
+const program = new Command()
+  .name("vps-bootstrap")
+  .description("Create a Vultr VPS with cloud-init bootstrap data.")
+  .requiredOption("-k, --vultr-api-key <key>", "Vultr API key")
+  .requiredOption(
+    "-s, --ssh-authorized-keys <keys>",
+    "SSH authorized keys, comma-separated",
+  )
+  .option("--label <label>", "VPS label")
+  .option("--region <region>", "Vultr region", "sea")
+  .option("--plan <plan>", "Vultr plan", "vc2-1c-1gb")
+  .option("--os-id <id>", "Vultr OS ID", parseInteger, 2760)
+  .parse();
+
+const options = program.opts<Options>();
+const vpsLabel = options.label ?? `VPS ${new Date().toISOString()}`;
 
 const cloudConfig = `#cloud-config
 
@@ -32,7 +54,7 @@ users:
     lock_passwd: true
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     ssh_authorized_keys:
-      ${sshAuthorizedKeys
+      ${options.sshAuthorizedKeys
         .split(",")
         .map((key) => `- ${key}`)
         .join("\n")}
@@ -47,13 +69,13 @@ users:
 const response = await fetch(`https://api.vultr.com/v2/instances`, {
   method: "POST",
   headers: {
-    Authorization: `Bearer ${vultrApiKey}`,
+    Authorization: `Bearer ${options.vultrApiKey}`,
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    region: "sea", // @todo
-    plan: "vc2-1c-1gb", // @todo
-    os_id: 2760, // @todo
+    region: options.region,
+    plan: options.plan,
+    os_id: options.osId,
     user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
     label: vpsLabel,
   }),
@@ -61,6 +83,4 @@ const response = await fetch(`https://api.vultr.com/v2/instances`, {
 
 const json = await response.json();
 
-console.log("\n" + JSON.stringify(json, null, 2));
-
-rl.close();
+console.log(JSON.stringify(json, null, 2));
