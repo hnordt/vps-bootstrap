@@ -24,7 +24,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - key-only SSH access for a `deploy` user
 - a locked root account
 - unattended package upgrades
-- UFW firewall rules for SSH, HTTP, and HTTPS
+- UFW firewall rules for SSH and Cloudflare-proxied HTTP/HTTPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`
@@ -34,7 +34,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 The resulting app path is:
 
 ```txt
-browser -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world app
+browser -> Cloudflare -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world app
 ```
 
 ## Files
@@ -67,7 +67,7 @@ Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
 - npm.
 - A Vultr API key with permission to create instances.
 - One or more SSH public keys, such as the contents of `~/.ssh/id_ed25519.pub`.
-- A domain name you can point at the new server.
+- A domain name you can proxy through Cloudflare and point at the new server.
 
 Install dependencies:
 
@@ -103,20 +103,36 @@ The rendered cloud-config is sent to Vultr; it is not written to a local file.
 
 ## DNS
 
+This bootstrap assumes Cloudflare is the external HTTP/HTTPS proxy.
+
 After the instance is created:
 
 1. Open the Vultr Console URL printed by the script.
 2. Copy the instance public IPv4 address.
-3. Create an `A` record for your domain pointing to that address.
-4. Wait for DNS to propagate.
+3. In Cloudflare DNS, create an `A` record for your domain pointing to that
+   address.
+4. Set the DNS record proxy status to **Proxied**.
+5. Wait for DNS to propagate.
 
-Caddy is configured for the domain you entered. It will manage the HTTPS
-certificate automatically when the domain resolves to the server and the server
-is reachable on HTTP/HTTPS.
+The origin firewall accepts inbound `80/tcp` and `443/tcp` only from
+Cloudflare's published IPv4 and IPv6 ranges. Direct origin HTTP/HTTPS requests
+from non-Cloudflare IP addresses are blocked by UFW.
 
-If you use Cloudflare, create the DNS record there. The current cloud-config
-opens ports `80/tcp` and `443/tcp` directly; it does not restrict HTTPS to
-Cloudflare IP ranges.
+Caddy is configured for the domain you entered and forwards Cloudflare's
+`CF-Connecting-IP` value as `X-Forwarded-For`, so the Node.js app can receive
+the original visitor IP through the forwarded header.
+
+For Cloudflare SSL/TLS mode, use **Full** or **Full (strict)**. Use **Full** if
+the origin certificate is not yet valid for strict verification. Use
+**Full (strict)** after the origin has a certificate Cloudflare can validate.
+
+SSH remains direct. Use the server public IP address, or an unproxied DNS
+record, for `ssh deploy@...`. Cloudflare's normal proxied DNS records do not
+proxy SSH.
+
+Cloudflare IP ranges are hardcoded in `src/cloud-config.yaml`. Before
+provisioning a new server from an old checkout, compare them with
+`https://www.cloudflare.com/ips/`.
 
 ## Verify The Server
 
@@ -184,7 +200,7 @@ production secrets directly in `src/cloud-config.yaml`.
 Before using this as a production baseline, review:
 
 - whether the selected Ubuntu image in `src/vultr.ts` is the one you want
-- whether ports `80/tcp` and `443/tcp` should be open to the public internet
+- whether the hardcoded Cloudflare IP ranges are still current
 - whether the app service should run your real app instead of the hello-world server
 - whether Litestream needs a real configuration and backup credentials
 - whether your DNS and HTTPS setup matches your edge provider
