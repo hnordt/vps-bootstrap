@@ -28,7 +28,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`
-- Caddy as the public reverse proxy with baseline HTTP security headers
+- Caddy as the public reverse proxy, configured with baseline HTTP security headers
 - Litestream installed from its Debian package
 
 The resulting app path is:
@@ -138,8 +138,8 @@ proxy SSH.
 
 ## HTTP Security Headers
 
-Caddy adds baseline HTTP security headers to every response served by the public
-site block:
+This repository's Caddy setup adds baseline HTTP security headers to every
+response served by the public site block:
 
 ```txt
 Strict-Transport-Security: max-age=31536000; includeSubDomains
