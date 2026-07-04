@@ -28,7 +28,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`
-- Caddy as the public reverse proxy
+- Caddy as the public reverse proxy with baseline HTTP security headers
 - Litestream installed from its Debian package
 
 The resulting app path is:
@@ -136,6 +136,29 @@ SSH remains direct. Use the server public IP address, or an unproxied DNS
 record, for `ssh deploy@...`. Cloudflare's normal proxied DNS records do not
 proxy SSH.
 
+## HTTP Security Headers
+
+Caddy adds baseline HTTP security headers to every response served by the public
+site block:
+
+```txt
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
+These headers define the following browser-side defaults:
+
+- HTTPS is required for future requests to the domain and its subdomains.
+- The site cannot be embedded in a frame.
+- Browsers should not MIME-sniff responses away from their declared content type.
+- Cross-origin referrers expose only the origin instead of the full URL.
+
+The HSTS header intentionally does not include `preload`. Add `preload` only if
+the root domain and all subdomains are permanently HTTPS-only and you intend to
+submit the domain to the browser preload list.
+
 ## Verify The Server
 
 SSH into the server as `deploy`:
@@ -204,5 +227,6 @@ Before using this as a production baseline, review:
 - whether the selected Ubuntu image in `src/vultr.ts` is the one you want
 - whether your provisioning environment can reach Cloudflare's IP range endpoints
 - whether the app service should run your real app instead of the hello-world server
+- whether the default security headers match your embedding, referrer, and subdomain policy
 - whether Litestream needs a real configuration and backup credentials
 - whether your DNS and HTTPS setup matches your edge provider
