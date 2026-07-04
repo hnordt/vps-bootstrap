@@ -142,7 +142,7 @@ This repository's Caddy setup adds baseline HTTP security headers to every
 response served by the public site block:
 
 ```txt
-Strict-Transport-Security: max-age=31536000; includeSubDomains
+Strict-Transport-Security: max-age=31536000
 X-Frame-Options: DENY
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
@@ -150,14 +150,15 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 These headers define the following browser-side defaults:
 
-- HTTPS is required for future requests to the domain and its subdomains.
+- HTTPS is required for future requests to the configured domain.
 - The site cannot be embedded in a frame.
 - Browsers should not MIME-sniff responses away from their declared content type.
 - Cross-origin referrers expose only the origin instead of the full URL.
 
-The HSTS header intentionally does not include `preload`. Add `preload` only if
-the root domain and all subdomains are permanently HTTPS-only and you intend to
-submit the domain to the browser preload list.
+The HSTS header intentionally does not include `includeSubDomains` or `preload`.
+Add `includeSubDomains` only if every subdomain is HTTPS-ready. Add `preload`
+only if the root domain and all subdomains are permanently HTTPS-only and you
+intend to submit the domain to the browser preload list.
 
 ## Verify The Server
 
