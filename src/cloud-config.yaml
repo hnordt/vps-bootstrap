@@ -3,11 +3,9 @@
 ssh_pwauth: false
 disable_root: true
 
-package_update: true
 package_upgrade: true
 
 packages:
-  - apt-transport-https
   - curl
   - debian-archive-keyring
   - debian-keyring
@@ -93,9 +91,7 @@ write_files:
       Wants=network-online.target
 
       [Service]
-      Type=simple
       User=app
-      Group=app
       WorkingDirectory=/opt/hello
       ExecStart=/usr/bin/node /opt/hello/server.js
       Restart=always
@@ -106,9 +102,6 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  # Enable automatic updates
-  - systemctl enable --now apt-daily.timer apt-daily-upgrade.timer
-
   # Configure UFW
   - ufw default deny incoming
   - ufw default allow outgoing
@@ -138,7 +131,6 @@ runcmd:
   - systemctl enable --now hello-node
   - install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
   - caddy validate --config /etc/caddy/Caddyfile
-  - systemctl enable caddy
   - systemctl restart caddy
 
 power_state:
