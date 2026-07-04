@@ -160,9 +160,11 @@ record **Proxied** at all times: Caddy renews certificates automatically in the
 background, and renewal has the same reachability requirement as first
 issuance. With this firewall policy, Let's Encrypt can only reach the HTTP-01
 challenge through Cloudflare's proxy. If you switch the record to **DNS only**,
-renewals start failing silently while the site stays up on the current
-certificate, and the site goes down weeks later when that certificate expires.
-Check `journalctl -u caddy` for renewal errors.
+the site goes down immediately: browsers connect directly to the origin from
+non-Cloudflare IP addresses, and UFW blocks them. Certificate renewal also
+fails while the record is DNS only. Check `journalctl -u caddy` for renewal
+errors, renewals can also fail silently while **Proxied** if a Cloudflare
+redirect or WAF rule interferes with the HTTP-01 challenge path.
 
 If you stay **Proxied** and want to remove the ACME reachability dependency
 entirely, use a Cloudflare origin certificate or configure Caddy for DNS-01
