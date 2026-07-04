@@ -6,6 +6,13 @@ disable_root: true
 package_update: true
 package_upgrade: true
 
+packages:
+  - apt-transport-https
+  - curl
+  - debian-archive-keyring
+  - debian-keyring
+  - gpg
+
 groups:
   - app
 
@@ -22,3 +29,12 @@ users:
     groups: [app]
     shell: /usr/sbin/nologin
     lock_passwd: true
+
+runcmd:
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
+  - chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - chmod o+r /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install -y caddy
+  - systemctl enable --now caddy
