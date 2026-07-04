@@ -84,16 +84,16 @@ write_files:
         header {
           defer
 
-          # Enable HSTS for the configured domain.
+          # Enable HSTS for the configured domain
           Strict-Transport-Security "max-age=31536000"
 
-          # Disable clients from sniffing the media type.
+          # Disable clients from sniffing the media type
           X-Content-Type-Options "nosniff"
 
-          # Add clickjacking protection.
+          # Add clickjacking protection
           X-Frame-Options "DENY"
 
-          # Limit cross-origin referrer details.
+          # Limit cross-origin referrer details
           Referrer-Policy "strict-origin-when-cross-origin"
         }
 
