@@ -26,7 +26,7 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - unattended package upgrades
 - UFW firewall rules for SSH and Cloudflare-proxied HTTP/HTTPS
 - fail2ban for SSH protection
-- Node.js from the Ubuntu package repositories
+- Node.js 22 from the NodeSource apt repository
 - a simple Node.js hello-world app bound to `127.0.0.1:3000`, backed by a
   SQLite database created with the built-in `node:sqlite` module
 - a root-owned app environment file at `/etc/app/.env`
@@ -143,11 +143,16 @@ your deployment target supports one.
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
 module, so no npm dependencies are needed. `node:sqlite` requires Node.js
-v22.13.0 or newer, which the Ubuntu 26.04 `nodejs` package satisfies.
+v22.13.0 or newer, so provisioning installs Node.js 22 from the NodeSource apt
+repository instead of the distribution `nodejs` package — several of the
+Debian-based images offered by the OS selector still ship Node.js 18.
 
 The database lives at `/var/lib/app/app.db`. The `app` service uses
 `StateDirectory=app`, so systemd creates `/var/lib/app` owned by the `app`
-user, and it is the only path the hardened service can write to. The app reads
+user, and it is the only path the hardened service can write to. The directory
+is created with `0700` permissions (`StateDirectoryMode=0700`) and the service
+runs with `UMask=0077`, so the database and WAL files are not readable by
+other service accounts, such as `caddy`. The app reads
 the directory from the `STATE_DIRECTORY` environment variable that systemd
 sets, and falls back to the current directory when run outside systemd. On
 startup the app enables WAL journal mode, which Litestream requires, and
@@ -195,16 +200,20 @@ commented Cloudflare R2 example, which uses the account-scoped endpoint and
 `region: auto`. See the [Litestream guides](https://litestream.io/guides/) for
 other provider-specific settings.
 
-To restore the database from the replica, stop the app, remove the damaged
+To restore the database from the replica, stop both the app and Litestream so
+replication cannot observe a half-restored database, remove the damaged
 database files (`litestream restore` refuses to overwrite an existing
-database), restore, and return ownership to the `app` user:
+database) together with Litestream's local `app.db-litestream` metadata
+directory so the next sync does not compare the restored database against
+stale tracking state, restore, return ownership to the `app` user, and start
+both services again:
 
 ```bash
-sudo systemctl stop app
-sudo rm -f /var/lib/app/app.db /var/lib/app/app.db-wal /var/lib/app/app.db-shm
+sudo systemctl stop app litestream
+sudo rm -rf /var/lib/app/app.db /var/lib/app/app.db-wal /var/lib/app/app.db-shm /var/lib/app/app.db-litestream
 sudo litestream restore /var/lib/app/app.db
 sudo chown app:app /var/lib/app/app.db*
-sudo systemctl start app
+sudo systemctl start litestream app
 ```
 
 ## DNS

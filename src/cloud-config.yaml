@@ -14,7 +14,6 @@ packages:
   - curl
   - fail2ban
   - gpg
-  - nodejs
   - ufw
   - unattended-upgrades
 
@@ -121,10 +120,12 @@ write_files:
       User=app
       WorkingDirectory=/opt/app
       StateDirectory=app
+      StateDirectoryMode=0700
       EnvironmentFile=-/etc/app/.env
       ExecStart=/usr/bin/node /opt/app/server.js
       Restart=always
       RestartSec=5
+      UMask=0077
       NoNewPrivileges=true
       ProtectSystem=strict
       PrivateTmp=true
@@ -153,7 +154,7 @@ write_files:
         }
       }
 
-  - path: /etc/litestream.yml
+  - path: /opt/app/litestream.yml
     owner: root:root
     permissions: "0600"
     content: |
@@ -190,6 +191,13 @@ runcmd:
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
+  # Set up Node.js
+  - |
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+    echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install -y nodejs
+
   # Set up the app service
   - |
     systemctl daemon-reload
@@ -209,7 +217,9 @@ runcmd:
   - |
     curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
     apt-get install -y /run/litestream.deb
-    systemctl enable --now litestream
+    install -m 0600 /opt/app/litestream.yml /etc/litestream.yml
+    systemctl enable litestream
+    systemctl restart litestream
 
 power_state:
   mode: reboot
