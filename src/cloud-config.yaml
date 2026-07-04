@@ -143,14 +143,19 @@ runcmd:
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
-  # Set up Caddy and Litestream
+  # Set up Caddy
   - |
     set -eu
     curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -fsSL -o /etc/apt/sources.list.d/caddy-stable.list https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt
-    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
     apt-get update
-    apt-get install -y caddy /run/litestream.deb
+    apt-get install -y caddy
+
+  # Set up Litestream
+  - |
+    set -eu
+    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
+    apt-get install -y /run/litestream.deb
     systemctl enable --now litestream
 
   # Set up the Node.js service and the reverse proxy
