@@ -12,7 +12,7 @@ async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
   pathname: string,
   responseSchema: T,
-  body?: Record<string, any>,
+  body?: Record<string, string | number | boolean | null | undefined>,
 ) {
   const response = await fetch(new URL(pathname, "https://api.vultr.com"), {
     method: body ? "POST" : "GET",
