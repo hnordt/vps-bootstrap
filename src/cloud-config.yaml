@@ -40,6 +40,12 @@ write_files:
       APT::Periodic::Unattended-Upgrade "1";
 
 runcmd:
+  # Configure UFW
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw limit 22/tcp comment "SSH"
+  - ufw --force enable
+
   # Install Caddy
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
