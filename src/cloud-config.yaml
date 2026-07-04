@@ -120,13 +120,16 @@ write_files:
       [Service]
       User=app
       WorkingDirectory=/opt/app
+      EnvironmentFile=-/etc/app/.env
+      UMask=0077
+
       StateDirectory=app
       StateDirectoryMode=0700
-      EnvironmentFile=-/etc/app/.env
+
       ExecStart=/usr/bin/node /opt/app/server.js
       Restart=always
       RestartSec=5
-      UMask=0077
+
       NoNewPrivileges=true
       ProtectSystem=strict
       PrivateTmp=true
