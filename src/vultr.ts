@@ -144,6 +144,7 @@ let cloudConfig = fs.readFileSync(
   path.join(import.meta.dirname, "cloud-config.yaml"),
   "utf8",
 );
+cloudConfig = cloudConfig.replace(/^# NOTE:\n(?:#[^\n]*(?:\n|$))+\n?/m, "");
 cloudConfig = cloudConfig.replace(
   "${{ __SSH_AUTHORIZED_KEYS__ }}",
   JSON.stringify(
