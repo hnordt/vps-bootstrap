@@ -3,11 +3,6 @@ import * as fs from "node:fs";
 import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
-const OS = {
-  id: 2760, // Ubuntu 26.04 LTS x64
-  minRam: 1024, // MB
-};
-
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
   pathname: string,
@@ -63,7 +58,7 @@ const apiKey = await p.password({
 
 const regions = await sendRequest(
   apiKey,
-  "/v2/regions",
+  "/v2/regions?per_page=500",
   z.object({
     regions: z.array(
       z.object({
@@ -84,7 +79,7 @@ const region = await p.select({
   pageSize: 15,
 });
 
-const [availability, plans] = await Promise.all([
+const [availability, plans, oses] = await Promise.all([
   sendRequest(
     apiKey,
     `/v2/regions/${region}/availability`,
@@ -94,7 +89,7 @@ const [availability, plans] = await Promise.all([
   ),
   sendRequest(
     apiKey,
-    "/v2/plans",
+    "/v2/plans?per_page=500",
     z.object({
       plans: z.array(
         z.object({
@@ -110,16 +105,36 @@ const [availability, plans] = await Promise.all([
       ),
     }),
   ),
+  sendRequest(
+    apiKey,
+    "/v2/os?per_page=500",
+    z.object({
+      os: z.array(
+        z.object({
+          id: z.number(),
+          name: z.string(),
+          family: z.string(),
+          arch: z.string(),
+        }),
+      ),
+    }),
+  ),
 ]);
+
+const osId = await p.select({
+  message: "Select a Vultr operating system",
+  choices: oses.os
+    .filter((os) => os.family === "ubuntu" || os.family === "debian")
+    .toSorted((left, right) => right.name.localeCompare(left.name))
+    .map((os) => ({ name: os.name, value: os.id })),
+  pageSize: 15,
+});
 
 const availablePlanIds = new Set(availability.available_plans);
 
 const availablePlans = plans.plans
   .filter(
-    (plan) =>
-      availablePlanIds.has(plan.id) &&
-      plan.locations.includes(region) &&
-      plan.ram >= OS.minRam,
+    (plan) => availablePlanIds.has(plan.id) && plan.locations.includes(region),
   )
   .sort(
     (left, right) =>
@@ -170,7 +185,7 @@ const instance = await sendRequest(
   {
     region,
     plan,
-    os_id: OS.id,
+    os_id: osId,
     user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
   },
 );
