@@ -1,7 +1,10 @@
 import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
-const OS_ID = 2760; // Ubuntu 22.04 LTS x64
+const OS = {
+  id: 2760, // Ubuntu 22.04 LTS x64
+  minRam: 1024,
+};
 
 async function sendRequest<T extends z.ZodTypeAny>(
   apiKey: string,
@@ -99,8 +102,12 @@ const [availability, plans] = await Promise.all([
 const availablePlanIds = new Set(availability.available_plans);
 
 const availablePlans = plans.plans
-  .filter((plan) => availablePlanIds.has(plan.id))
-  .filter((plan) => plan.locations.includes(region))
+  .filter(
+    (plan) =>
+      availablePlanIds.has(plan.id) &&
+      plan.locations.includes(region) &&
+      plan.ram >= OS.minRam,
+  )
   .sort(
     (left, right) =>
       left.monthly_cost - right.monthly_cost ||
@@ -163,7 +170,7 @@ const instance = await sendRequest(
   {
     region,
     plan,
-    os_id: OS_ID,
+    os_id: OS.id,
     user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
   },
 );

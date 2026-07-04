@@ -1,7 +1,7 @@
 {
   "type": "module",
   "scripts": {
-    "start": "node --experimental-strip-types ./src/cli.ts"
+    "vultr": "node --experimental-strip-types ./src/vultr.ts"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
