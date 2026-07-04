@@ -164,7 +164,7 @@ runcmd:
     systemctl daemon-reload
     systemctl enable --now hello-node
 
-  # Set up Caddy as the reverse proxy
+  # Configure Caddy as the reverse proxy
   - |
     set -eu
     install -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
