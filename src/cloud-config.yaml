@@ -82,10 +82,22 @@ write_files:
         encode zstd gzip
 
         header {
-          >Strict-Transport-Security "max-age=31536000"
-          >X-Frame-Options "DENY"
-          >X-Content-Type-Options "nosniff"
-          >Referrer-Policy "strict-origin-when-cross-origin"
+          defer
+
+          # Disable FLoC tracking.
+          Permissions-Policy "interest-cohort=()"
+
+          # Enable HSTS for the configured domain.
+          Strict-Transport-Security "max-age=31536000"
+
+          # Disable clients from sniffing the media type.
+          X-Content-Type-Options "nosniff"
+
+          # Add clickjacking protection.
+          X-Frame-Options "DENY"
+
+          # Limit cross-origin referrer details.
+          Referrer-Policy "strict-origin-when-cross-origin"
         }
 
         reverse_proxy 127.0.0.1:3000 {
