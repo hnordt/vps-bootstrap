@@ -27,15 +27,18 @@ The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS
 - UFW firewall rules for SSH and Cloudflare-proxied HTTP/HTTPS
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
-- a simple Node.js hello-world app bound to `127.0.0.1:3000`
-- a root-owned app environment file at `/etc/hello/.env`
+- a simple Node.js hello-world app bound to `127.0.0.1:3000`, backed by a
+  SQLite database created with the built-in `node:sqlite` module
+- a root-owned app environment file at `/etc/app/.env`
 - Caddy as the public reverse proxy, configured with baseline HTTP security headers
-- Litestream installed from its Debian package
+- Litestream installed from its Debian package and configured to replicate the
+  app database to `/var/backups/app`, with off-site replication as a
+  post-provisioning switch
 
 The resulting app path is:
 
 ```txt
-browser -> Cloudflare -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world app
+browser -> Cloudflare -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world app -> SQLite at /var/lib/app/app.db
 ```
 
 ## Files
@@ -105,12 +108,12 @@ The rendered cloud-config is sent to Vultr; it is not written to a local file.
 
 ## App Config And Secrets
 
-The `hello-node` systemd service loads environment variables from
-`/etc/hello/.env` at startup when the file exists.
+The `app` systemd service loads environment variables from
+`/etc/app/.env` at startup when the file exists.
 
 This env file is created by cloud-init, but the service treats it as optional so
-`hello-node` can still start if the file is not present yet. Values in
-`/etc/hello/.env` should use systemd environment-file syntax:
+`app` can still start if the file is not present yet. Values in
+`/etc/app/.env` should use systemd environment-file syntax:
 
 ```ini
 DATABASE_URL=postgres://user:password@example.internal/app
@@ -122,19 +125,94 @@ service read it while keeping it unavailable to normal users. To change values
 after provisioning, edit the file as root and restart the service:
 
 ```bash
-sudoedit /etc/hello/.env
-sudo systemctl restart hello-node
+sudoedit /etc/app/.env
+sudo systemctl restart app
 ```
 
 The sample app and Caddy upstream are both bound to `127.0.0.1:3000`. If you
 change the app listener, update the Caddy `reverse_proxy` target at the same
-time instead of setting only `PORT` in `/etc/hello/.env`.
+time instead of setting only `PORT` in `/etc/app/.env`.
 
 Do not commit real secrets to `src/cloud-config.yaml`. Cloud-init user data is
 sent to the VPS provider, may be retained by the provider, and can be read from
 inside the instance by privileged users. Prefer adding production secrets after
 the instance is created, or inject them through a provider secret mechanism if
 your deployment target supports one.
+
+## Database And Backups
+
+The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
+module, so no npm dependencies are needed. `node:sqlite` requires Node.js
+v22.13.0 or newer, which the Ubuntu 26.04 `nodejs` package satisfies.
+
+The database lives at `/var/lib/app/app.db`. The `app` service uses
+`StateDirectory=app`, so systemd creates `/var/lib/app` owned by the `app`
+user, and it is the only path the hardened service can write to. The directory
+is created with `0700` permissions (`StateDirectoryMode=0700`) and the service
+runs with `UMask=0077`, so the database and WAL files are not readable by
+other service accounts, such as `caddy`. The app reads
+the directory from the `STATE_DIRECTORY` environment variable that systemd
+sets, and falls back to the current directory when run outside systemd. On
+startup the app enables WAL journal mode, which Litestream requires, and
+creates a `visits` table that it increments on every request.
+
+Litestream continuously replicates the database. Cloud-init writes its
+configuration to `/etc/litestream.yml`, and the default replica is a local
+directory, `/var/backups/app`, which Litestream creates on first sync. This
+works with no credentials, so backups run from first boot. A local replica
+protects against application-level damage, like a bad migration, corruption,
+or an accidental delete, but not against losing the disk or the instance. For
+real disaster recovery, switch the replica to off-instance storage.
+
+To switch to an S3-compatible bucket (AWS S3, Cloudflare R2, Backblaze B2,
+MinIO), edit the config as root:
+
+```bash
+sudoedit /etc/litestream.yml
+```
+
+Replace the `replica` block with your bucket and credentials:
+
+```yaml
+dbs:
+  - path: /var/lib/app/app.db
+    replica:
+      url: s3://your-bucket/app
+      access-key-id: your-key-id
+      secret-access-key: your-secret
+```
+
+Then restart the service and watch for a successful sync:
+
+```bash
+sudo systemctl restart litestream
+sudo journalctl -u litestream -f
+```
+
+The config file is `root:root` with `0600` permissions so replica credentials
+stay readable by root only. Do not put real credentials in
+`src/cloud-config.yaml` itself (see
+[App Config And Secrets](#app-config-and-secrets)). For non-AWS providers, add
+an `endpoint` field to the replica; `/etc/litestream.yml` ships with a
+commented Cloudflare R2 example, which uses the account-scoped endpoint and
+`region: auto`. See the [Litestream guides](https://litestream.io/guides/) for
+other provider-specific settings.
+
+To restore the database from the replica, stop both the app and Litestream so
+replication cannot observe a half-restored database, remove the damaged
+database files (`litestream restore` refuses to overwrite an existing
+database) together with Litestream's local `app.db-litestream` metadata
+directory so the next sync does not compare the restored database against
+stale tracking state, restore, return ownership to the `app` user, and start
+both services again:
+
+```bash
+sudo systemctl stop app litestream
+sudo rm -rf /var/lib/app/app.db /var/lib/app/app.db-wal /var/lib/app/app.db-shm /var/lib/app/app.db-litestream
+sudo litestream restore /var/lib/app/app.db
+sudo chown app:app /var/lib/app/app.db*
+sudo systemctl start litestream app
+```
 
 ## DNS
 
@@ -233,9 +311,10 @@ Check cloud-init and services:
 ```bash
 cloud-init status --long
 sudo ufw status verbose
-sudo systemctl status hello-node
+sudo systemctl status app
 sudo systemctl status caddy
 sudo systemctl status fail2ban
+sudo systemctl status litestream
 ```
 
 Check the app:
@@ -245,11 +324,70 @@ curl -i http://127.0.0.1:3000
 curl -I https://YOUR_DOMAIN
 ```
 
-The response body from the app should be:
+The response body from the app should be a hello message with a visit count
+read from the SQLite database:
 
 ```txt
 Hello world
+Visits: 1
 ```
+
+Check that Litestream is replicating the database:
+
+```bash
+sudo journalctl -u litestream
+sudo ls /var/backups/app
+```
+
+The journal should show an `initialized db` line followed by periodic
+`snapshot complete` and `compaction complete` lines, and the backup directory
+should contain an `ltx` subdirectory. See
+[Database And Backups](#database-and-backups) for switching backups to
+off-instance storage.
+
+## Deploy Your App
+
+The hello-world server is a placeholder. The intended workflow is to replace
+it with your real app — typically a compiled or bundled build — through the
+`deploy` user.
+
+`/opt/app` is owned by root on purpose: the `app` service user cannot modify
+its own code, so a compromised app cannot rewrite what the service executes.
+Deploys write through the `deploy` user's passwordless sudo instead.
+
+A minimal deploy script, run from your workstation or CI, uploads the build to
+the deploy user's home directory, installs it into `/opt/app` as root, and
+restarts the service:
+
+```bash
+#!/bin/sh
+set -eu
+
+host="deploy@YOUR_SERVER_IP"
+
+scp dist/server.js "$host:server.js.next"
+ssh "$host" "
+  sudo install -o root -g root -m 0644 server.js.next /opt/app/server.js
+  rm server.js.next
+  sudo systemctl restart app
+  systemctl is-active app
+"
+```
+
+If your build outputs a compiled binary instead of a Node.js entrypoint,
+install it with mode `0755` and update `ExecStart` once:
+
+```bash
+sudoedit /etc/systemd/system/app.service
+# ExecStart=/opt/app/server
+sudo systemctl daemon-reload
+sudo systemctl restart app
+```
+
+Nothing else changes on deploy: the app keeps writing to
+`/var/lib/app/app.db`, Litestream keeps replicating it, and `/etc/app/.env` is
+preserved. If a deploy needs new config values, update `/etc/app/.env` before
+restarting (see [App Config And Secrets](#app-config-and-secrets)).
 
 ## Customization
 
@@ -257,11 +395,13 @@ To change what the server provisions, edit `src/cloud-config.yaml`.
 
 Common changes:
 
-- Replace `/opt/hello/server.js` with your application bootstrap.
-- Replace `hello-node.service` with your production systemd service.
-- Change `/opt/hello/Caddyfile` for routing, headers, or additional domains.
+- Replace `/opt/app/server.js` with your application bootstrap.
+- Adjust `ExecStart` in `app.service` if your deploy ships something other
+  than `node server.js`, such as a compiled binary.
+- Change `/etc/caddy/Caddyfile` for routing, headers, or additional domains.
 - Adjust UFW rules if the server should only accept traffic from a trusted edge.
-- Configure Litestream before relying on it for backups.
+- Change `/etc/litestream.yml` if your app uses a different database path or
+  needs provider-specific replica settings.
 
 To change Vultr-specific defaults, edit `src/vultr.ts`.
 
@@ -287,5 +427,5 @@ Before using this as a production baseline, review:
 - whether your provisioning environment can reach Cloudflare's IP range endpoints
 - whether the app service should run your real app instead of the hello-world server
 - whether the default security headers match your embedding, referrer, and subdomain policy
-- whether Litestream needs a real configuration and backup credentials
+- whether the default local-directory Litestream replica is enough, or whether backups belong off-instance
 - whether your DNS and HTTPS setup matches your edge provider
