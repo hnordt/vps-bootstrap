@@ -127,7 +127,6 @@ write_files:
       [Service]
       User=app
       WorkingDirectory=/opt/hello
-      Environment=PORT=3000
       EnvironmentFile=/etc/hello/.env
       ExecStart=/usr/bin/node /opt/hello/server.js
       Restart=always
