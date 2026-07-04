@@ -1,3 +1,5 @@
+import * as path from "node:path";
+import * as fs from "node:fs";
 import * as z from "zod";
 import * as p from "@inquirer/prompts";
 
@@ -127,37 +129,19 @@ const plan = await p.select({
   pageSize: 15,
 });
 
-const cloudConfig = `#cloud-config
-
-ssh_pwauth: false
-disable_root: true
-
-package_update: true
-package_upgrade: true
-
-groups:
-  - app
-
-users:
-  - name: deploy
-    groups: [sudo]
-    shell: /bin/bash
-    lock_passwd: true
-    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-    ssh_authorized_keys:
-      ${sshAuthorizedKeys
-        .split(",")
-        .map((key) => key.trim())
-        .filter(Boolean)
-        .map((key) => `- ${key}`)
-        .join("\n")}
-
-  - name: app
-    system: true
-    groups: [app]
-    shell: /usr/sbin/nologin
-    lock_passwd: true
-`;
+let cloudConfig = fs.readFileSync(
+  path.join(import.meta.dirname, "cloud-config.yaml"),
+  "utf8",
+);
+cloudConfig = cloudConfig.replace(
+  "${{ __SSH_AUTHORIZED_KEYS__ }}",
+  JSON.stringify(
+    sshAuthorizedKeys
+      .split(",")
+      .map((key) => key.trim())
+      .filter(Boolean),
+  ),
+);
 
 const instance = await sendRequest(
   apiKey,
