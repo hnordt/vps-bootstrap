@@ -56,28 +56,33 @@ const regionId = await p.select({
         color: "red",
       },
     )
-  ).regions.map((region) => ({
-    name: `${region.city}, ${region.country} (${region.id})`,
-    value: region.id,
-  })),
+  ).regions
+    .map((region) => ({
+      name: `${region.city}, ${region.country} (${region.id})`,
+      value: region.id,
+    }))
+    .toSorted((left, right) => left.name.localeCompare(right.name)),
 });
 
 console.log("");
 
+const plans = (
+  await oraPromise(
+    sendRequest(
+      null,
+      `/v2/regions/${regionId}/availability`,
+      z.object({
+        available_plans: z.array(z.string()),
+      }),
+    ),
+    "Loading plans",
+  )
+).available_plans.toSorted((left, right) => left.localeCompare(right));
+
 const planId = await p.select({
   message: "Select a plan",
-  choices: (
-    await oraPromise(
-      sendRequest(
-        null,
-        `/v2/regions/${regionId}/availability`,
-        z.object({
-          available_plans: z.array(z.string()),
-        }),
-      ),
-      "Loading plans",
-    )
-  ).available_plans,
+  choices: plans,
+  default: plans.find((plan) => plan.endsWith("-1c-1gb")) ?? plans[0],
 });
 
 console.log("");
@@ -104,7 +109,8 @@ const osId = await p.select({
     )
   ).os
     .filter((os) => os.family === "ubuntu" || os.family === "debian")
-    .toSorted((left, right) => right.name.localeCompare(left.name))
+    .toSorted((left, right) => left.name.localeCompare(right.name))
+    .toReversed()
     .map((os) => ({
       name: os.name,
       value: os.id,
