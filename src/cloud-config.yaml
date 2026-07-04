@@ -102,7 +102,7 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  # Configure UFW
+  # Set up UFW
   - ufw default deny incoming
   - ufw default allow outgoing
   - ufw limit 22/tcp comment "SSH"
