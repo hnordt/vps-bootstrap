@@ -3,7 +3,7 @@ import * as p from "@inquirer/prompts";
 
 const OS = {
   id: 2760, // Ubuntu 22.04 LTS x64
-  minRam: 1024,
+  minRam: 1024, // MB
 };
 
 async function sendRequest<T extends z.ZodTypeAny>(
