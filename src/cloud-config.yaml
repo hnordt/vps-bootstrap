@@ -1,5 +1,11 @@
 #cloud-config
 
+# NOTE:
+# The target OS is Ubuntu 26.04 LTS, but this is expected to work on most
+# Debian-based distros.
+# If you copy this cloud-config manually, replace each ${{ ... }} placeholder
+# before provisioning.
+
 ssh_pwauth: false
 disable_root: true
 
