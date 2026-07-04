@@ -125,6 +125,11 @@ runcmd:
   - apt-get update
   - apt-get install -y caddy
 
+  # Install Litestream
+  - curl -L -o /tmp/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
+  - dpkg -i /tmp/litestream.deb
+  - systemctl enable --now litestream
+
   # Start the Node.js app behind Caddy
   - systemctl daemon-reload
   - systemctl enable --now hello-node
