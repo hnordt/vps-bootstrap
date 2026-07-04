@@ -158,11 +158,15 @@ runcmd:
     apt-get install -y /run/litestream.deb
     systemctl enable --now litestream
 
-  # Set up the Node.js service and the reverse proxy
+  # Set up the Node.js service
   - |
     set -eu
     systemctl daemon-reload
     systemctl enable --now hello-node
+
+  # Set up Caddy as the reverse proxy
+  - |
+    set -eu
     install -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
     caddy validate --config /etc/caddy/Caddyfile
     systemctl restart caddy
