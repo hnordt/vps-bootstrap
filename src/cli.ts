@@ -1,40 +1,124 @@
-import { Command, InvalidArgumentError } from "commander";
+import * as z from "zod";
+import * as p from "@inquirer/prompts";
 
-type Options = {
-  vultrApiKey: string;
-  sshAuthorizedKeys: string;
-  label?: string;
-  region: string;
-  plan: string;
-  osId: number;
-};
+const OS_ID = 2760; // Ubuntu 22.04 LTS x64
 
-const parseInteger = (value: string) => {
-  const parsed = Number(value);
+async function sendRequest<T extends z.ZodTypeAny>(
+  apiKey: string,
+  endpoint: string,
+  schema: T,
+  body?: Record<string, any>,
+) {
+  const response = await fetch("https://api.vultr.com" + endpoint, {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 
-  if (!Number.isInteger(parsed)) {
-    throw new InvalidArgumentError(`expected an integer, received "${value}"`);
+  if (!response.ok) {
+    throw await response.json();
   }
 
-  return parsed;
-};
+  return schema.parse(await response.json());
+}
 
-const program = new Command()
-  .name("vps-bootstrap")
-  .description("Create a Vultr VPS with cloud-init bootstrap data.")
-  .requiredOption("-k, --vultr-api-key <key>", "Vultr API key")
-  .requiredOption(
-    "-s, --ssh-authorized-keys <keys>",
-    "SSH authorized keys, comma-separated",
-  )
-  .option("--label <label>", "VPS label")
-  .option("--region <region>", "Vultr region", "sea")
-  .option("--plan <plan>", "Vultr plan", "vc2-1c-1gb")
-  .option("--os-id <id>", "Vultr OS ID", parseInteger, 2760)
-  .parse();
+const sshAuthorizedKeys = await p.input({
+  message: "SSH authorized keys (comma-separated)",
+  validate(value) {
+    return (
+      value
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean).length > 0 || "Enter at least one SSH authorized key"
+    );
+  },
+});
 
-const options = program.opts<Options>();
-const vpsLabel = options.label ?? `VPS ${new Date().toISOString()}`;
+const apiKey = await p.password({
+  message: "Vultr API key",
+  mask: "*",
+  validate(value) {
+    return value.trim().length > 0 || "This value is required";
+  },
+});
+
+const regions = await sendRequest(
+  apiKey,
+  "/v2/regions",
+  z.object({
+    regions: z.array(
+      z.object({
+        id: z.string(),
+        city: z.string(),
+        country: z.string(),
+      }),
+    ),
+  }),
+);
+
+const region = await p.select({
+  message: "Select a Vultr region",
+  choices: regions.regions.map((region) => ({
+    name: `${region.city}, ${region.country} (${region.id})`,
+    value: region.id,
+  })),
+  pageSize: 15,
+});
+
+const [availability, plans] = await Promise.all([
+  sendRequest(
+    apiKey,
+    `/v2/regions/${region}/availability`,
+    z.object({
+      available_plans: z.array(z.string()),
+    }),
+  ),
+  sendRequest(
+    apiKey,
+    "/v2/plans",
+    z.object({
+      plans: z.array(
+        z.object({
+          id: z.string(),
+          vcpu_count: z.number(),
+          ram: z.number(),
+          disk: z.number(),
+          bandwidth: z.number(),
+          monthly_cost: z.number(),
+          type: z.string(),
+          locations: z.array(z.string()),
+        }),
+      ),
+    }),
+  ),
+]);
+
+const availablePlanIds = new Set(availability.available_plans);
+
+const availablePlans = plans.plans
+  .filter((plan) => availablePlanIds.has(plan.id))
+  .filter((plan) => plan.locations.includes(region))
+  .sort(
+    (left, right) =>
+      left.monthly_cost - right.monthly_cost ||
+      left.vcpu_count - right.vcpu_count ||
+      left.ram - right.ram ||
+      left.id.localeCompare(right.id),
+  );
+
+const plan = await p.select({
+  message: "Select a Vultr plan",
+  choices: availablePlans.map((plan) => ({
+    name: `${plan.id} - ${plan.vcpu_count} vCPU, ${plan.ram} MB RAM, ${plan.disk} GB disk, $${
+      plan.monthly_cost
+    }/mo`,
+    value: plan.id,
+  })),
+  pageSize: 15,
+});
 
 const cloudConfig = `#cloud-config
 
@@ -54,8 +138,10 @@ users:
     lock_passwd: true
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     ssh_authorized_keys:
-      ${options.sshAuthorizedKeys
+      ${sshAuthorizedKeys
         .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean)
         .map((key) => `- ${key}`)
         .join("\n")}
 
@@ -66,21 +152,22 @@ users:
     lock_passwd: true
 `;
 
-const response = await fetch(`https://api.vultr.com/v2/instances`, {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${options.vultrApiKey}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    region: options.region,
-    plan: options.plan,
-    os_id: options.osId,
-    user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
-    label: vpsLabel,
+const instance = await sendRequest(
+  apiKey,
+  "/v2/instances",
+  z.object({
+    instance: z.object({
+      id: z.string(),
+    }),
   }),
-});
+  {
+    region,
+    plan,
+    os_id: OS_ID,
+    user_data: Buffer.from(cloudConfig, "utf8").toString("base64"),
+  },
+);
 
-const json = await response.json();
-
-console.log(JSON.stringify(json, null, 2));
+console.info(
+  `Vultr instance created: https://console.vultr.com/subs/?id=${instance.instance.id}`,
+);
