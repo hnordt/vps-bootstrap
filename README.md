@@ -1,15 +1,14 @@
 # VPS Bootstrap
 
-Generate and submit a cloud-init config for a small Node.js VPS.
+Generate and submit a cloud-init config for a Node.js VPS.
 
-The current workflow is no longer "copy `cloud-config.yaml` into a provider
-console and edit placeholders by hand". Instead, `src/cloud-config.yaml` is a
-template, and `src/vultr.ts` renders it with your SSH keys and public domain
-before creating a Vultr instance through the Vultr API.
+`src/cloud-config.yaml` is a template, and `src/vultr.ts` renders it with your
+SSH keys and public domain before creating a Vultr instance through the Vultr
+API.
 
 ## What It Creates
 
-The generated cloud-init user data provisions an Ubuntu VPS with:
+The generated cloud-init user data provisions an Ubuntu 24.04 LTS VPS with:
 
 - key-only SSH access for a `deploy` user
 - a locked root account
