@@ -19,7 +19,7 @@ future.
 
 ## What It Creates
 
-The generated cloud-init user data provisions an Ubuntu VPS with:
+The generated cloud-init user data targets Ubuntu 26.04 LTS and provisions a VPS with:
 
 - key-only SSH access for a `deploy` user
 - a locked root account
@@ -58,8 +58,8 @@ To use the bootstrap template without the Vultr automation:
 4. Paste the rendered cloud-init config into your provider's user-data or
    cloud-init field when creating the instance.
 
-Make sure the selected server image supports cloud-init. The template is written
-for Ubuntu 26.04 LTS.
+Make sure the selected server image supports cloud-init. The template targets
+Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
 
 ## Prerequisites
 
