@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "types": ["node"],
+    "erasableSyntaxOnly": true,
+    "noEmit": true
+  }
+}
