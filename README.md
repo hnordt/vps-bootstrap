@@ -155,6 +155,14 @@ ranges from `https://www.cloudflare.com/ips-v4` and
 and `443/tcp` from those ranges only. Direct origin HTTP/HTTPS requests from
 non-Cloudflare IP addresses are blocked by UFW.
 
+Because Caddy obtains public certificates through ACME HTTP-01 by default, keep
+the DNS record **Proxied** before the first HTTPS request and during renewals.
+With this firewall policy, Let's Encrypt can only reach the HTTP-01 challenge
+through Cloudflare's proxy. If you switch the record to **DNS only**, certificate
+issuance or renewal can fail and the site may go down when the certificate
+expires. For DNS-only origins, deliberately change the UFW policy, use a
+Cloudflare origin certificate, or configure Caddy for DNS-01 validation instead.
+
 The VPS does not automatically refresh Cloudflare IP ranges after provisioning.
 Cloudflare changes these ranges infrequently, and this keeps the generated UFW
 configuration immutable unless you intentionally update it. If Cloudflare
