@@ -72,9 +72,10 @@ write_files:
         console.log(`Hello world server listening on http://${host}:${port}`);
       });
 
-  - path: /opt/hello/Caddyfile
+  - path: /etc/caddy/Caddyfile
     owner: root:root
     permissions: "0644"
+    defer: true
     content: |
       ${{ __PUBLIC_DOMAIN__ }} {
         encode zstd gzip
@@ -126,7 +127,6 @@ runcmd:
   # Start the Node.js app behind Caddy
   - systemctl daemon-reload
   - systemctl enable --now hello-node
-  - install -o root -g root -m 0644 /opt/hello/Caddyfile /etc/caddy/Caddyfile
   - caddy validate --config /etc/caddy/Caddyfile
   - systemctl restart caddy
 
