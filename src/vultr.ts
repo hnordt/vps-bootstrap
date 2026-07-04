@@ -45,10 +45,9 @@ const sshAuthorizedKeys = await p.input({
 const publicDomain = await p.input({
   message: "Public domain for HTTPS",
   validate(value) {
-    const domain = value.trim().toLowerCase();
     return (
       /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
-        domain,
+        value.trim().toLowerCase(),
       ) || "Enter a valid public domain, like example.com"
     );
   },
