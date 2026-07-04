@@ -1,235 +1,190 @@
 # VPS Bootstrap
 
-Cloud-init setup for running a production-oriented Node.js server on a single VPS behind Cloudflare.
+Bootstrap a Node.js VPS with a reusable cloud-init template and optional
+provider automation.
 
-The default setup targets Ubuntu 24.04 LTS and includes:
+The goal of this bootstrap is to stay provider-agnostic, so the cloud-init
+template can be used with any VPS provider that accepts cloud-init user data.
 
-- Node.js
-- Cloudflare as the public edge
-- Caddy as the origin HTTPS reverse proxy
-- systemd services for the application and Litestream
-- SQLite with WAL mode
-- UFW firewall rules
-- fail2ban
-- unattended security upgrades
-- key-only SSH access
+Currently, the repository includes an automated deployment script for Vultr.
+If you run `npm run vultr`, the script will ask you a few questions and create
+a Vultr instance.
 
-## Goal
+If you do not use Vultr, you can still copy `src/cloud-config.yaml`, replace the
+placeholders manually, and create the VPS instance in your preferred provider's
+console.
 
-This repository provides a predictable baseline for a single-VPS deployment.
+More automated deployment scripts for other providers may be added in the
+future.
+
+## What It Creates
+
+The generated cloud-init user data provisions an Ubuntu 24.04 LTS VPS with:
+
+- key-only SSH access for a `deploy` user
+- a locked root account
+- unattended package upgrades
+- UFW firewall rules for SSH, HTTP, and HTTPS
+- fail2ban for SSH protection
+- Node.js from the Ubuntu package repositories
+- a simple Node.js hello-world app bound to `127.0.0.1:3000`
+- Caddy as the public reverse proxy
+- Litestream installed from its Debian package
+
+The resulting app path is:
 
 ```txt
-browser -> Cloudflare edge -> 443 -> Caddy -> 127.0.0.1:3000 -> Node app -> SQLite
+browser -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world app
 ```
 
-The application should listen on `127.0.0.1`. Cloudflare should be the public HTTP entrypoint, and Caddy should only accept HTTPS from Cloudflare IP ranges.
+## Files
 
-The cloud-config file is the source of truth for the generated systemd units and Caddy configuration.
+- `src/cloud-config.yaml`: cloud-init template. It contains placeholders for generated values.
+- `src/vultr.ts`: interactive Vultr deployment script. It renders the template and sends it as instance user data.
+- `package.json`: exposes the `npm run vultr` command.
 
-## Deployment Setup
+Template placeholders:
 
-Use `cloud-config.yaml` with any VPS provider that supports cloud-init user data, such as Vultr, DigitalOcean, Hetzner, Linode, AWS Lightsail, or another Ubuntu VPS host.
+- `${{ __SSH_AUTHORIZED_KEYS__ }}`: replaced with a JSON-style YAML array of SSH public keys.
+- `${{ __PUBLIC_DOMAIN__ }}`: replaced with the domain Caddy should serve.
 
-1. Choose an Ubuntu 24.04 LTS image.
-2. Choose a region close to your users.
-3. Create a Cloudflare Origin Certificate for the app hostname you will use as `__DOMAIN__`.
-4. Replace every placeholder value in `cloud-config.yaml`, including the SSH public key, Cloudflare certificate, and object storage settings.
-5. Create the VPS and paste the full contents of `cloud-config.yaml`, starting with `#cloud-config`, into the provider's cloud-init or user data field.
-6. Copy the VPS public IPv4 address from the provider console.
-7. In Cloudflare, create a proxied `A` record for `__DOMAIN__` pointing to the VPS public IPv4 address.
-8. Set Cloudflare SSL/TLS mode to `Full (strict)`.
-9. Wait for cloud-init to finish, then connect as the `deploy` user and verify the services.
+## Manual Provider Setup
+
+To use the bootstrap template without the Vultr automation:
+
+1. Copy the contents of `src/cloud-config.yaml`.
+2. Replace `${{ __SSH_AUTHORIZED_KEYS__ }}` with a YAML array of SSH public keys.
+3. Replace `${{ __PUBLIC_DOMAIN__ }}` with the domain Caddy should serve.
+4. Paste the rendered cloud-init config into your provider's user-data or
+   cloud-init field when creating the instance.
+
+Make sure the selected server image supports cloud-init. The template is written
+for Ubuntu 24.04 LTS.
+
+## Prerequisites
+
+- Node.js with support for `--experimental-strip-types` available in `node`.
+- npm.
+- A Vultr API key with permission to create instances.
+- One or more SSH public keys, such as the contents of `~/.ssh/id_ed25519.pub`.
+- A domain name you can point at the new server.
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+## Deploy To Vultr
+
+Run the interactive deployment script:
+
+```bash
+npm run vultr
+```
+
+The script will ask for:
+
+1. SSH authorized keys, comma-separated.
+2. The public domain Caddy should serve.
+3. Your Vultr API key.
+4. A Vultr region.
+5. A Vultr plan available in that region.
+
+After you confirm the prompts, the script:
+
+1. Reads `src/cloud-config.yaml`.
+2. Replaces the SSH key and domain placeholders.
+3. Base64-encodes the rendered cloud-init payload.
+4. Creates a Vultr instance using the rendered payload as user data.
+5. Prints a Vultr Console URL for the new instance.
+
+The rendered cloud-config is sent to Vultr; it is not written to a local file.
+
+## DNS
+
+After the instance is created:
+
+1. Open the Vultr Console URL printed by the script.
+2. Copy the instance public IPv4 address.
+3. Create an `A` record for your domain pointing to that address.
+4. Wait for DNS to propagate.
+
+Caddy is configured for the domain you entered. It will manage the HTTPS
+certificate automatically when the domain resolves to the server and the server
+is reachable on HTTP/HTTPS.
+
+If you use Cloudflare, create the DNS record there. The current cloud-config
+opens ports `80/tcp` and `443/tcp` directly; it does not restrict HTTPS to
+Cloudflare IP ranges.
+
+## Verify The Server
+
+SSH into the server as `deploy`:
 
 ```bash
 ssh deploy@YOUR_SERVER_IP
-cloud-init status --long
-sudo ufw status verbose
-sudo systemctl status app
-sudo systemctl status caddy
-sudo systemctl status litestream
-curl -I https://app.example.com/health
 ```
 
-This setup expects Cloudflare to be the public entrypoint for your domain. The VPS still serves HTTPS with Caddy, but only Cloudflare IP ranges should be able to reach it.
+Check cloud-init and services:
 
-The VPS firewall allows SSH and allows HTTPS only from Cloudflare IP ranges.
+```bash
+cloud-init status --long
+sudo ufw status verbose
+sudo systemctl status hello-node
+sudo systemctl status caddy
+sudo systemctl status fail2ban
+```
 
-Cloudflare Origin Certificates secure the connection between Cloudflare and the origin server. They are compatible with Full (strict) mode, but they are not browser-trusted certificates if someone bypasses Cloudflare and connects directly to the origin.
+Check the app:
 
-The template keeps port 80 closed. Cloudflare can handle HTTP to HTTPS redirects at the edge.
+```bash
+curl -i http://127.0.0.1:3000
+curl -I https://YOUR_DOMAIN
+```
 
-The template syncs Cloudflare IP ranges into UFW at boot and then weekly through a systemd timer.
+The response body from the app should be:
 
-Because traffic reaches your VPS from Cloudflare, the app must read the real client IP from `CF-Connecting-IP`; the direct peer address will be a Cloudflare address.
+```txt
+Hello world
+```
 
-Placeholder reference:
+## Customization
 
-- `__SSH_PUBLIC_KEY__`: The SSH public key allowed to log in as the `deploy` user. Use the public half of your key, such as the contents of `~/.ssh/id_ed25519.pub`.
-- `__DOMAIN__`: The app hostname Caddy serves, such as `app.example.com`. This should match the proxied Cloudflare DNS record and Origin Certificate hostname.
-- `__CLOUDFLARE_ORIGIN_CERT_PEM__`: The Cloudflare Origin Certificate PEM for `__DOMAIN__`. Caddy uses this certificate for HTTPS between Cloudflare and the VPS.
-- `__CLOUDFLARE_ORIGIN_KEY_PEM__`: The private key paired with the Cloudflare Origin Certificate. Keep it secret.
-- `__S3_ENDPOINT__`: The S3-compatible object storage endpoint used by Litestream, such as a regional S3, R2, Spaces, or Object Storage endpoint.
-- `__S3_REGION__`: The object storage region expected by the S3-compatible API.
-- `__S3_BUCKET__`: The bucket where Litestream stores SQLite backup snapshots and WAL segments.
-- `__S3_ACCESS_KEY_ID__`: The access key Litestream uses to write to the backup bucket.
-- `__S3_SECRET_ACCESS_KEY__`: The secret key paired with `__S3_ACCESS_KEY_ID__`. Keep it secret and scope it to the backup bucket or path.
+To change what the server provisions, edit `src/cloud-config.yaml`.
 
-## Secrets
+Common changes:
+
+- Replace `/opt/hello/server.js` with your application bootstrap.
+- Replace `hello-node.service` with your production systemd service.
+- Change `/opt/hello/Caddyfile` for routing, headers, or additional domains.
+- Adjust UFW rules if the server should only accept traffic from a trusted edge.
+- Configure Litestream before relying on it for backups.
+
+To change Vultr-specific defaults, edit `src/vultr.ts`.
+
+Common changes:
+
+- `OS.id`: the Vultr operating system image.
+- `OS.minRam`: the minimum RAM used when filtering plans.
+- instance creation options in the `/v2/instances` request body.
+
+## Security Notes
 
 Do not commit real credentials.
 
-Do not place production long-lived secrets directly in cloud-init user data when you can avoid it. User data may be retained by the VPS provider and may be readable from inside the instance through the provider metadata service, not only by `root`.
+The Vultr API key is entered interactively and is not stored by this repository.
+The SSH public keys and domain are embedded in the cloud-init user data sent to
+Vultr.
 
-For production, prefer this flow:
+Cloud-init user data may be retained by the VPS provider and may be readable
+from inside the instance by privileged users. Avoid putting long-lived
+production secrets directly in `src/cloud-config.yaml`.
 
-1. Deploy with placeholder or temporary credentials.
-2. Upload final secret files over SSH after the server boots.
-3. Store backup credentials in files readable only by the `litestream` user or group.
-4. Keep the application user unable to read backup credentials.
-5. Use object storage credentials scoped to the one backup bucket or path.
-6. Enable bucket versioning. Use object lock if you need stronger protection against destructive backup deletion.
+Before using this as a production baseline, review:
 
-## Litestream
-
-Litestream 0.5 uses a single `replica` field in the configuration file.
-
-The template uses the v0.5 configuration shape and pins the Litestream release URL to `v0.5.13`.
-
-The installer automatically downloads the matching GitHub release archive and the release `checksums.txt` file, then verifies the archive before extracting it as `root`.
-
-Security notice: this removes the manual checksum step while still detecting corrupted or mismatched downloads. It is less strict than storing the expected SHA256 in this repository, because the archive and checksum file are both fetched from the same GitHub release during provisioning. If you need stronger supply-chain control, vendor the expected checksum in `cloud-config.yaml` or install Litestream from a trusted internal package mirror.
-
-When upgrading Litestream:
-
-1. Choose the new release version.
-2. Update `LITESTREAM_VERSION` in `cloud-config.yaml`.
-3. Confirm the release includes a `checksums.txt` asset and Linux archive for each target architecture.
-4. Test restore and replication on a disposable VPS before using the new version in production.
-
-For disposable manual testing, this snippet installs the latest Litestream release for the current architecture and verifies it against the release checksum file. Production provisioning should use the pinned version in `cloud-config.yaml`.
-
-```bash
-ARCH="$(dpkg --print-architecture)"
-case "$ARCH" in
-  amd64) LITESTREAM_ARCH="x86_64" ;;
-  arm64) LITESTREAM_ARCH="arm64" ;;
-  *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
-esac
-
-release_json="$(curl -fsSL https://api.github.com/repos/benbjohnson/litestream/releases/latest)"
-LITESTREAM_VERSION="$(printf '%s' "$release_json" | jq -r .tag_name)"
-LITESTREAM_FILE="litestream-${LITESTREAM_VERSION#v}-linux-${LITESTREAM_ARCH}.tar.gz"
-LITESTREAM_BASE_URL="https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}"
-
-tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
-curl -fsSL "${LITESTREAM_BASE_URL}/${LITESTREAM_FILE}" -o "${tmp}/${LITESTREAM_FILE}"
-curl -fsSL "${LITESTREAM_BASE_URL}/checksums.txt" -o "${tmp}/checksums.txt"
-cd "$tmp"
-grep -F "  ${LITESTREAM_FILE}" checksums.txt | sha256sum -c -
-tar -xzf "${LITESTREAM_FILE}" -C /usr/local/bin litestream
-chmod 0755 /usr/local/bin/litestream
-```
-
-## Restore Test
-
-Backups are only useful if restore is tested.
-
-Stop services:
-
-```bash
-sudo systemctl stop app
-sudo systemctl stop litestream
-```
-
-Move the current database away:
-
-```bash
-sudo mv /var/lib/app/data.db /var/lib/app/data.db.bak
-sudo rm -f /var/lib/app/data.db-wal /var/lib/app/data.db-shm
-```
-
-Restore from object storage:
-
-```bash
-sudo -u litestream litestream restore \
-  -config /etc/litestream.yml \
-  /var/lib/app/data.db
-```
-
-Fix ownership:
-
-```bash
-sudo chown app:app /var/lib/app/data.db*
-sudo chmod 0660 /var/lib/app/data.db*
-```
-
-Start services:
-
-```bash
-sudo systemctl start litestream
-sudo systemctl start app
-```
-
-Verify:
-
-```bash
-sudo systemctl status litestream
-sudo systemctl status app
-curl -I https://app.example.com/health
-```
-
-Before trusting backups, test a full restore on a scratch VPS.
-
-## Security Checklist
-
-SSH:
-
-- [ ] Root login is disabled.
-- [ ] Password login is disabled.
-- [ ] Only the `deploy` user can SSH.
-- [ ] Your SSH private key is protected with a passphrase.
-- [ ] Optional: SSH is restricted to known IP addresses.
-
-Firewall:
-
-- [ ] UFW is enabled.
-- [ ] Default incoming policy is deny.
-- [ ] Default outgoing policy is allow.
-- [ ] Only `22/tcp` and Cloudflare-sourced `443/tcp` are open.
-- [ ] Cloudflare IP sync fetches and validates the new list before deleting existing allow rules.
-
-Application boundary:
-
-- [ ] The Node app binds to `127.0.0.1`, not `0.0.0.0`.
-- [ ] Cloudflare is the public HTTP entrypoint.
-- [ ] Caddy only accepts HTTPS from Cloudflare IP ranges.
-- [ ] The database is stored under `/var/lib/app`.
-- [ ] Application code is stored outside writable application state.
-- [ ] The app does not run as root.
-- [ ] The app user cannot overwrite deployed application code.
-- [ ] The app user cannot read Litestream backup credentials.
-
-Backups:
-
-- [ ] Litestream is running.
-- [ ] Litestream runs as a dedicated `litestream` user.
-- [ ] Object storage credentials are not committed.
-- [ ] Production object storage credentials are not placed in cloud-init user data when avoidable.
-- [ ] Object storage credentials are scoped to the backup bucket or path only.
-- [ ] Bucket versioning is enabled.
-- [ ] Object lock is enabled if destructive backup deletion must be prevented.
-- [ ] Restore has been tested.
-
-Supply chain:
-
-- [ ] Litestream version is pinned.
-- [ ] Litestream release archive is verified against the pinned release `checksums.txt` before extraction.
-- [ ] You accept the GitHub release checksum trust model, or you vendor the expected SHA256 for stricter supply-chain control.
-
-Operations:
-
-- [ ] Security updates are enabled.
-- [ ] Disk usage is monitored.
-- [ ] `/health` is monitored.
-- [ ] Logs are retained but bounded.
+- whether the selected Ubuntu image in `src/vultr.ts` is the one you want
+- whether ports `80/tcp` and `443/tcp` should be open to the public internet
+- whether the app service should run your real app instead of the hello-world server
+- whether Litestream needs a real configuration and backup credentials
+- whether your DNS and HTTPS setup matches your edge provider

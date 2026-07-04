@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "vultr": "node --experimental-strip-types ./src/vultr.ts"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.5.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0"
+  }
+}
