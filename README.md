@@ -71,7 +71,8 @@ The cloud-init template targets Ubuntu 26.04 LTS and provisions:
 - unattended package upgrades
 - UFW firewall: SSH rate-limited, HTTP/HTTPS allowed only from
   Cloudflare-proxied IP ranges
-- fail2ban for SSH protection
+- fail2ban for SSH protection, with Python systemd bindings installed so
+  the `systemd` backend is available without relying on package recommends
 - Node.js from the Ubuntu package repositories
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
   the built-in `node:sqlite` module when available
