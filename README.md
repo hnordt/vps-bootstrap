@@ -65,7 +65,7 @@ off-instance ([Database And Backups](#database-and-backups)).
 
 ## What It Creates
 
-The cloud-init template targets Ubuntu 26.04 LTS and provisions:
+The cloud-init template targets Debian-based distributions, favoring current Ubuntu LTS releases, and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
 - unattended package upgrades
@@ -119,7 +119,7 @@ To use the bootstrap template without the Vultr automation:
    cloud-init field when creating the instance.
 
 Make sure the selected server image supports cloud-init. The template targets
-Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
+Debian-based distributions and favors current Ubuntu LTS releases.
 
 ## Verify The Server
 
