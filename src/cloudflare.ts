@@ -10,7 +10,7 @@ process.on("uncaughtException", (error) => {
   throw error;
 });
 
-const cloudflareApiUrl = "https://api.cloudflare.com/client/v4";
+const cloudflareApiUrl = "https://api.cloudflare.com/client/v4/";
 
 const cloudflareErrorSchema = z.object({
   code: z.number().optional(),
@@ -24,6 +24,10 @@ const cloudflareEnvelopeSchema = <T extends z.ZodTypeAny>(result: T) =>
     messages: z.array(z.unknown()).default([]),
     result,
   });
+
+function createCloudflareUrl(pathname: string) {
+  return new URL(pathname.replace(/^\/+/, ""), cloudflareApiUrl);
+}
 
 function formatCloudflareErrors(errors: z.infer<typeof cloudflareErrorSchema>[]) {
   if (errors.length === 0) {
@@ -46,7 +50,7 @@ async function sendRequest<T extends z.ZodTypeAny>(
     body?: unknown;
   } = {},
 ): Promise<z.infer<T>> {
-  const response = await fetch(new URL(pathname, cloudflareApiUrl), {
+  const response = await fetch(createCloudflareUrl(pathname), {
     method: options.method ?? "GET",
     headers: {
       Authorization: `Bearer ${apiToken}`,
