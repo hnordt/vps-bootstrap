@@ -263,7 +263,7 @@ runcmd:
     case "$ARCH" in
       amd64) LITESTREAM_ARCH="x86_64" ;;
       arm64) LITESTREAM_ARCH="arm64" ;;
-      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+      *) echo "Unsupported architecture: $ARCH. Supported: amd64, arm64" >&2; exit 1 ;;
     esac
     curl -fsSL -o /run/litestream.deb "https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-${LITESTREAM_ARCH}.deb"
     apt-get install -y /run/litestream.deb
