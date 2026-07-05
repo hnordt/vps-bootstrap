@@ -210,7 +210,7 @@ runcmd:
     ufw limit 22/tcp
     ufw --force enable
 
-  # Set up Cloudflare
+  # Allow Cloudflare traffic
   - |
     for range in $(
       curl -fsSL https://api.cloudflare.com/client/v4/ips |
