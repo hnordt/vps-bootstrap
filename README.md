@@ -65,7 +65,7 @@ off-instance ([Database And Backups](#database-and-backups)).
 
 ## What It Creates
 
-The cloud-init template targets Ubuntu 26.04 LTS and provisions:
+The cloud-init template targets Debian-based distributions, favoring current Ubuntu LTS releases, and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
 - unattended package upgrades
@@ -73,11 +73,14 @@ The cloud-init template targets Ubuntu 26.04 LTS and provisions:
   Cloudflare-proxied IP ranges
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
+- fail2ban for SSH protection, with Python systemd bindings installed so
+  the `systemd` backend is available without relying on package recommends
+- Node.js 22.x from the NodeSource APT repository
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
   the built-in `node:sqlite` module when available
 - a root-owned app environment file at `/etc/app/.env`
-- Caddy as the public reverse proxy, configured with baseline HTTP security
-  headers
+- Caddy as the public reverse proxy, configured with [baseline HTTP security
+  headers](#http-security-headers)
 - Litestream, installed from its GitHub-released Debian package, replicating
   the app database to `/var/backups/app`, with off-site replication as a
   post-provisioning switch
@@ -118,7 +121,7 @@ To use the bootstrap template without the Vultr automation:
    cloud-init field when creating the instance.
 
 Make sure the selected server image supports cloud-init. The template targets
-Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
+Debian-based distributions and favors current Ubuntu LTS releases.
 
 ## Verify The Server
 
@@ -239,7 +242,7 @@ your deployment target supports one.
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
 module, so no npm dependencies are needed. Cloud-init installs Node.js 22.x
-from the NodeSource repository before starting the app because Debian's distro
+from the NodeSource repository before starting the app because Ubuntu's distro
 `nodejs` package may be too old to provide `node:sqlite`. If `node:sqlite` is
 unavailable, the server fails during startup instead of serving traffic with
 non-persistent state.
@@ -253,7 +256,8 @@ database and WAL files are not readable by other service accounts, such as
 `caddy`. The app reads the directory from the `STATE_DIRECTORY` environment
 variable that systemd sets, and falls back to the current directory when run
 outside systemd. On startup the app enables WAL journal mode, which Litestream
-requires, and creates a `visits` table that it increments on every request.
+requires, creates a `counters` table, and increments the `visits` counter on
+every request.
 
 Litestream continuously replicates the database. Cloud-init writes its
 configuration to `/etc/litestream.yml`, and the default replica is a local
