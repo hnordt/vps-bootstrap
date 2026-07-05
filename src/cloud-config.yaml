@@ -14,6 +14,7 @@ packages:
   - curl
   - fail2ban
   - gpg
+  - python3-systemd
   - ufw
   - unattended-upgrades
 
