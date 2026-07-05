@@ -163,6 +163,10 @@ write_files:
       ${{ __PUBLIC_DOMAIN__ }} {
         encode zstd gzip
 
+        reverse_proxy 127.0.0.1:3000 {
+          header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+        }
+
         header {
           defer
 
@@ -170,10 +174,6 @@ write_files:
           X-Content-Type-Options "nosniff"
           X-Frame-Options "DENY"
           Referrer-Policy "strict-origin-when-cross-origin"
-        }
-
-        reverse_proxy 127.0.0.1:3000 {
-          header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
         }
       }
 
@@ -214,7 +214,7 @@ runcmd:
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
-  # Install Node.js 22.x for node:sqlite support
+  # Set up Node.js
   - |
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
     echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
