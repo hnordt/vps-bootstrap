@@ -14,6 +14,7 @@ packages:
   - curl
   - fail2ban
   - gpg
+  - jq
   - python3-systemd
   - ufw
   - unattended-upgrades
@@ -208,9 +209,12 @@ runcmd:
     ufw default allow outgoing
     ufw limit 22/tcp
     ufw --force enable
-    ips_v4="$(curl -fsSL https://www.cloudflare.com/ips-v4)"
-    ips_v6="$(curl -fsSL https://www.cloudflare.com/ips-v6)"
-    for range in $ips_v4 $ips_v6; do
+
+  # Allow Cloudflare traffic
+  - |
+    cloudflare_ips=$(curl -fsSL https://api.cloudflare.com/client/v4/ips)
+    ranges=$(echo "$cloudflare_ips" | jq -r '.result.ipv4_cidrs[], .result.ipv6_cidrs[]')
+    for range in $ranges; do
       ufw allow proto tcp from "$range" to any port 80,443
     done
 

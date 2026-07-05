@@ -319,10 +319,9 @@ sudo systemctl start litestream app
 This bootstrap assumes Cloudflare is the external HTTP/HTTPS proxy.
 
 During provisioning, cloud-init fetches Cloudflare's current IPv4 and IPv6
-ranges from `https://www.cloudflare.com/ips-v4` and
-`https://www.cloudflare.com/ips-v6`, then creates UFW allow rules for `80/tcp`
-and `443/tcp` from those ranges only. Direct origin HTTP/HTTPS requests from
-non-Cloudflare IP addresses are blocked by UFW.
+ranges from `https://api.cloudflare.com/client/v4/ips`, then creates UFW allow
+rules for `80/tcp` and `443/tcp` from those ranges only. Direct origin
+HTTP/HTTPS requests from non-Cloudflare IP addresses are blocked by UFW.
 
 Because Caddy obtains public certificates through ACME HTTP-01, keep the DNS
 record **Proxied** at all times: Caddy renews certificates automatically in the
