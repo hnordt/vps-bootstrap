@@ -27,9 +27,9 @@ npm run vultr
 ```
 
 Answer the prompts: region, plan (a 1 vCPU / 1 GB plan is preselected when
-available), operating system (pick the newest Ubuntu LTS), your domain, your
-SSH public keys (comma-separated), and your Vultr API key. The script creates
-the instance and prints its Vultr Console URL.
+available), operating system (pick the newest Ubuntu LTS image with cloud-init
+support), your domain, your SSH public keys (comma-separated), and your Vultr
+API key. The script creates the instance and prints its Vultr Console URL.
 
 **2. Point DNS at the server:**
 
@@ -65,7 +65,7 @@ off-instance ([Database And Backups](#database-and-backups)).
 
 ## What It Creates
 
-The cloud-init template targets Ubuntu 26.04 LTS and provisions:
+The cloud-init template targets the newest Ubuntu LTS image and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
 - unattended package upgrades
@@ -119,7 +119,8 @@ To use the bootstrap template without the Vultr automation:
    cloud-init field when creating the instance.
 
 Make sure the selected server image supports cloud-init. The template targets
-Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
+the newest Ubuntu LTS image, but should probably work on most Debian-based
+distributions.
 
 ## Verify The Server
 
