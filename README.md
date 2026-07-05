@@ -71,8 +71,7 @@ The cloud-init template targets Debian-based distributions, favoring current Ubu
 - unattended package upgrades
 - UFW firewall: SSH rate-limited, HTTP/HTTPS allowed only from
   Cloudflare-proxied IP ranges
-- fail2ban for SSH protection, with Python systemd bindings installed so
-  the `systemd` backend is available without relying on package recommends
+- fail2ban for SSH protection
 - Node.js 22.x from the NodeSource APT repository
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
   the built-in `node:sqlite` module when available
