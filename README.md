@@ -254,7 +254,8 @@ database and WAL files are not readable by other service accounts, such as
 `caddy`. The app reads the directory from the `STATE_DIRECTORY` environment
 variable that systemd sets, and falls back to the current directory when run
 outside systemd. On startup the app enables WAL journal mode, which Litestream
-requires, and creates a `visits` table that it increments on every request.
+requires, creates a `counters` table, and increments the `visits` counter on
+every request.
 
 Litestream continuously replicates the database. Cloud-init writes its
 configuration to `/etc/litestream.yml`, and the default replica is a local
