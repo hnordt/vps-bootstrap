@@ -130,11 +130,11 @@ const publicDomain = await p.input({
 console.log("");
 
 const sshAuthorizedKeys = await p.input({
-  message: "SSH authorized keys (newline-separated, paste multiple lines)",
+  message: "SSH authorized keys (comma-separated)",
   validate(value) {
     return (
       value
-        .split("\n")
+        .split(",")
         .map((key) => key.trim())
         .filter(Boolean).length > 0 || "Enter at least one SSH authorized key"
     );
@@ -152,7 +152,7 @@ cloudConfig = cloudConfig.replace(
   "${{ __SSH_AUTHORIZED_KEYS__ }}",
   JSON.stringify(
     sshAuthorizedKeys
-      .split("\n")
+      .split(",")
       .map((key) => key.trim())
       .filter(Boolean),
   ),
