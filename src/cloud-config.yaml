@@ -208,9 +208,13 @@ runcmd:
     ufw default allow outgoing
     ufw limit 22/tcp
     ufw --force enable
-    ips_v4="$(curl -fsSL https://www.cloudflare.com/ips-v4)"
-    ips_v6="$(curl -fsSL https://www.cloudflare.com/ips-v6)"
-    for range in $ips_v4 $ips_v6; do
+
+  # Set up Cloudflare
+  - |
+    for range in $(
+      curl -fsSL https://api.cloudflare.com/client/v4/ips |
+        python3 -c 'import json, sys; result = json.load(sys.stdin)["result"]; print("\n".join(result["ipv4_cidrs"] + result["ipv6_cidrs"]))'
+    ); do
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
