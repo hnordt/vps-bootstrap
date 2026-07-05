@@ -228,6 +228,7 @@ runcmd:
     ufw default deny incoming
     ufw default allow outgoing
     ufw limit 22/tcp
+    sed -i '/^COMMIT$/i -A ufw-after-output -d 169.254.169.254 -m owner ! --uid-owner 0 -j REJECT' /etc/ufw/after.rules
     ufw --force enable
     ips_v4="$(curl -fsSL https://www.cloudflare.com/ips-v4)"
     ips_v6="$(curl -fsSL https://www.cloudflare.com/ips-v6)"

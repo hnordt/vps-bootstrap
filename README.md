@@ -70,7 +70,8 @@ The cloud-init template targets Ubuntu 26.04 LTS and provisions:
 - key-only SSH access for a `deploy` user, with a locked root account
 - unattended package upgrades
 - UFW firewall: SSH rate-limited, HTTP/HTTPS allowed only from
-  Cloudflare-proxied IP ranges
+  Cloudflare-proxied IP ranges, and non-root access to the cloud metadata
+  service blocked
 - fail2ban for SSH protection
 - Node.js from the Ubuntu package repositories
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
