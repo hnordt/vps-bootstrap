@@ -14,7 +14,6 @@ packages:
   - curl
   - fail2ban
   - gpg
-  - nodejs
   - ufw
   - unattended-upgrades
 
@@ -235,6 +234,13 @@ runcmd:
     for range in $ips_v4 $ips_v6; do
       ufw allow proto tcp from "$range" to any port 80,443
     done
+
+  # Install Node.js 22.x for node:sqlite support
+  - |
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+    echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    apt-get install -y nodejs
 
   # Set up the app service
   - |
