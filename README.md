@@ -77,8 +77,8 @@ The cloud-init template targets Ubuntu 26.04 LTS and provisions:
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
   the built-in `node:sqlite` module when available
 - a root-owned app environment file at `/etc/app/.env`
-- Caddy as the public reverse proxy, configured with baseline HTTP security
-  headers
+- Caddy as the public reverse proxy, configured with [baseline HTTP security
+  headers](#http-security-headers)
 - Litestream, installed from its GitHub-released Debian package, replicating
   the app database to `/var/backups/app`, with off-site replication as a
   post-provisioning switch
