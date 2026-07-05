@@ -75,7 +75,7 @@ The cloud-init template targets Debian-based distributions, favoring current Ubu
 - fail2ban for SSH protection
 - Node.js 22.x from the NodeSource APT repository
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
-  the built-in `node:sqlite` module when available
+  the built-in `node:sqlite` module
 - a root-owned app environment file at `/etc/app/.env`
 - Caddy as the public reverse proxy, configured with [baseline HTTP security
   headers](#http-security-headers)
@@ -161,9 +161,8 @@ should contain an `ltx` subdirectory.
 
 ## Deploy Your App
 
-The visit-counter server is a placeholder. The intended workflow is to replace
-it with your real app — typically a compiled or bundled build — through the
-`deploy` user.
+The visit-counter server is a placeholder. Replace it with your real app
+through the `deploy` user, typically using a compiled or bundled build.
 
 `/opt/app` is owned by root on purpose: the `app` service user cannot modify
 its own code, so a compromised app cannot rewrite what the service executes.
@@ -245,7 +244,7 @@ distro `nodejs` packages may be too old to provide `node:sqlite`. If
 `node:sqlite` is unavailable, the server fails during startup instead of serving
 traffic with non-persistent state.
 
-When SQLite is available, the database lives at `/var/lib/app/app.db`. The
+The database lives at `/var/lib/app/app.db`. The
 `app` service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
 owned by the `app` user, and it is the only path the hardened service can write
 to. The directory is created with `0700` permissions
