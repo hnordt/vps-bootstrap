@@ -44,14 +44,6 @@ write_files:
       APT::Periodic::Update-Package-Lists "1";
       APT::Periodic::Unattended-Upgrade "1";
 
-  - path: /etc/apt/apt.conf.d/52unattended-upgrades-reboot-policy
-    owner: root:root
-    permissions: "0644"
-    content: |
-      Unattended-Upgrade::Automatic-Reboot "false";
-      Unattended-Upgrade::Mail "root";
-      Unattended-Upgrade::MailReport "on-change";
-
   - path: /etc/fail2ban/jail.d/sshd.local
     owner: root:root
     permissions: "0644"
@@ -274,6 +266,15 @@ runcmd:
     install -m 0600 /run/litestream.yml /etc/litestream.yml
     systemctl enable litestream
     systemctl restart litestream
+
+  # Apply unattended-upgrades reporting/reboot policy after bootstrap work
+  # completes, so cloud-init package_upgrade runs with the image defaults.
+  - |
+    cat >/etc/apt/apt.conf.d/52unattended-upgrades-reboot-policy <<'EOF'
+    Unattended-Upgrade::Automatic-Reboot "false";
+    Unattended-Upgrade::Mail "root";
+    Unattended-Upgrade::MailReport "on-change";
+    EOF
 
 power_state:
   mode: reboot
