@@ -68,7 +68,7 @@ off-instance ([Database And Backups](#database-and-backups)).
 The cloud-init template targets Ubuntu 26.04 LTS and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
-- unattended package upgrades that never reboot automatically and report changes to root mail
+- unattended package upgrades that never reboot automatically and report changes to local root mail
 - UFW firewall: SSH rate-limited, HTTP/HTTPS allowed only from
   Cloudflare-proxied IP ranges
 - fail2ban for SSH protection

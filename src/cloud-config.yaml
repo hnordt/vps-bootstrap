@@ -12,8 +12,10 @@ package_upgrade: true
 packages:
   - ca-certificates
   - curl
+  - exim4-daemon-light
   - fail2ban
   - gpg
+  - bsd-mailx
   - ufw
   - unattended-upgrades
 
