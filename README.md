@@ -65,7 +65,7 @@ off-instance ([Database And Backups](#database-and-backups)).
 
 ## What It Creates
 
-The cloud-init template targets the newest Ubuntu LTS image and provisions:
+The cloud-init template targets Debian-based distributions, favoring current Ubuntu LTS releases, and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
 - unattended package upgrades
@@ -119,8 +119,7 @@ To use the bootstrap template without the Vultr automation:
    cloud-init field when creating the instance.
 
 Make sure the selected server image supports cloud-init. The template targets
-the newest Ubuntu LTS image, but should probably work on most Debian-based
-distributions.
+Debian-based distributions and favors current Ubuntu LTS releases.
 
 ## Verify The Server
 
@@ -255,7 +254,8 @@ database and WAL files are not readable by other service accounts, such as
 `caddy`. The app reads the directory from the `STATE_DIRECTORY` environment
 variable that systemd sets, and falls back to the current directory when run
 outside systemd. On startup the app enables WAL journal mode, which Litestream
-requires, and creates a `visits` table that it increments on every request.
+requires, creates a `counters` table, and increments the `visits` counter on
+every request.
 
 Litestream continuously replicates the database. Cloud-init writes its
 configuration to `/etc/litestream.yml`, and the default replica is a local
