@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "vultr": "node ./src/vultr.ts"
+    "vultr": "node ./src/vultr.ts",
+    "cloudflare": "node ./src/cloudflare.ts"
   },
   "engines": {
     "node": ">=22.18.0"

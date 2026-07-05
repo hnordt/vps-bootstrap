@@ -6,9 +6,11 @@ provider automation.
 The goal of this bootstrap is to stay provider-agnostic, so the cloud-init
 template can be used with any VPS provider that accepts cloud-init user data.
 
-Currently, the repository includes an automated deployment script for Vultr.
-If you run `npm run vultr`, the script will ask you a few questions and create
-a Vultr instance.
+Currently, the repository includes an automated deployment script for Vultr and
+an automated Cloudflare DNS setup script. If you run `npm run vultr`, the script
+will ask you a few questions and create a Vultr instance. If you run
+`npm run cloudflare`, the script will point your public domain at the instance
+through a proxied Cloudflare DNS record.
 
 If you do not use Vultr, you can still copy `src/cloud-config.yaml`, replace the
 placeholders manually, and create the VPS instance in your preferred provider's
@@ -45,7 +47,8 @@ browser -> Cloudflare -> 80/443 -> Caddy -> 127.0.0.1:3000 -> Node hello-world a
 
 - `src/cloud-config.yaml`: cloud-init template. It contains placeholders for generated values.
 - `src/vultr.ts`: interactive Vultr deployment script. It renders the template and sends it as instance user data.
-- `package.json`: exposes the `npm run vultr` command.
+- `src/cloudflare.ts`: interactive Cloudflare DNS setup script. It creates or updates the proxied `A` record for the public domain.
+- `package.json`: exposes the `npm run vultr` and `npm run cloudflare` commands.
 
 Template placeholders:
 
@@ -70,6 +73,7 @@ Ubuntu 26.04 LTS, but should probably work on most Debian-based distributions.
 - Node.js v22.18.0+.
 - npm.
 - A Vultr API key with permission to create instances.
+- A Cloudflare API token with Zone Read and DNS Edit permissions.
 - One or more SSH public keys, such as the contents of `~/.ssh/id_ed25519.pub`.
 - A domain name you can proxy through Cloudflare and point at the new server.
 
@@ -105,6 +109,47 @@ After you confirm the prompts, the script:
 5. Prints a Vultr Console URL for the new instance.
 
 The rendered cloud-config is sent to Vultr; it is not written to a local file.
+
+## Set Up Cloudflare DNS
+
+After the instance is created and you have its public IPv4 address, run the
+interactive Cloudflare DNS setup script:
+
+```bash
+npm run cloudflare
+```
+
+The script will ask for:
+
+1. The public domain Caddy should serve.
+2. The server public IPv4 address.
+3. Your Cloudflare API token.
+
+The script finds the Cloudflare zone by walking up the public domain's parent
+labels, then creates or updates one proxied `A` record for the exact public
+domain.
+
+The DNS record is written with:
+
+```txt
+type: A
+name: YOUR_DOMAIN
+content: YOUR_SERVER_IP
+ttl: automatic
+proxied: true
+```
+
+If more than one `A` record already exists for the same domain, the script fails
+instead of guessing which record to overwrite.
+
+Required Cloudflare token permissions:
+
+- Zone:Zone:Read
+- Zone:DNS:Read
+- Zone:DNS:Edit
+
+The script intentionally does not mutate zone-level SSL/TLS settings. For
+Cloudflare SSL/TLS mode, use **Full** or **Full (strict)** manually.
 
 ## App Config And Secrets
 
@@ -224,10 +269,12 @@ After the instance is created:
 
 1. Open the Vultr Console URL printed by the script.
 2. Copy the instance public IPv4 address.
-3. In Cloudflare DNS, create an `A` record for your domain pointing to that
-   address.
-4. Set the DNS record proxy status to **Proxied**.
-5. Wait for DNS to propagate.
+3. Run `npm run cloudflare` to create or update the proxied `A` record.
+4. Wait for DNS to propagate.
+
+If you prefer to do this manually, create an `A` record for your domain pointing
+to the instance public IPv4 address, then set the DNS record proxy status to
+**Proxied**.
 
 During provisioning, cloud-init fetches Cloudflare's current IPv4 and IPv6
 ranges from `https://www.cloudflare.com/ips-v4` and
@@ -412,13 +459,22 @@ Common changes:
 - the default operating system selector, which fetches Debian-family Vultr images and preselects the latest Ubuntu LTS image.
 - instance creation options in the `/v2/instances` request body.
 
+To change Cloudflare-specific defaults, edit `src/cloudflare.ts`.
+
+Common changes:
+
+- the DNS record type or proxy setting.
+- whether multiple existing `A` records should be treated as an error.
+- whether zone-level settings should be managed by a separate script.
+
 ## Security Notes
 
 Do not commit real credentials.
 
 The Vultr API key is entered interactively and is not stored by this repository.
-The SSH public keys and domain are embedded in the cloud-init user data sent to
-Vultr.
+The Cloudflare API token is also entered interactively and is not stored by this
+repository. The SSH public keys and domain are embedded in the cloud-init user
+data sent to Vultr.
 
 Cloud-init user data may be retained by the VPS provider and may be readable
 from inside the instance by privileged users. See [App Config And Secrets](#app-config-and-secrets)
