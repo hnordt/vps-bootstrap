@@ -321,7 +321,9 @@ This bootstrap assumes Cloudflare is the external HTTP/HTTPS proxy.
 During provisioning, cloud-init fetches Cloudflare's current IPv4 and IPv6
 ranges from `https://api.cloudflare.com/client/v4/ips`, then creates UFW allow
 rules for `80/tcp` and `443/tcp` from those ranges only. Direct origin
-HTTP/HTTPS requests from non-Cloudflare IP addresses are blocked by UFW.
+HTTP/HTTPS requests from non-Cloudflare IP addresses are blocked by UFW. If the
+ranges cannot be fetched or parsed, provisioning fails closed and leaves
+HTTP/HTTPS blocked.
 
 Because Caddy obtains public certificates through ACME HTTP-01, keep the DNS
 record **Proxied** at all times: Caddy renews certificates automatically in the

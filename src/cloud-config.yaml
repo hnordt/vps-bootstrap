@@ -212,13 +212,13 @@ runcmd:
 
   # Allow Cloudflare traffic
   - |
-    cloudflare_ips=$(curl -fsSL https://api.cloudflare.com/client/v4/ips)
-    ranges=$(echo "$cloudflare_ips" | jq -r '.result.ipv4_cidrs[], .result.ipv6_cidrs[]')
+    curl -fsSL -o /run/cloudflare-ips.json https://api.cloudflare.com/client/v4/ips
+    ranges=$(jq -re '.result.ipv4_cidrs[], .result.ipv6_cidrs[]' /run/cloudflare-ips.json)
     for range in $ranges; do
       ufw allow proto tcp from "$range" to any port 80,443
     done
 
-  # Set up Node.js
+  # Install Node.js
   - |
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
     echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
