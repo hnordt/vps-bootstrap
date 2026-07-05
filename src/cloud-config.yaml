@@ -265,5 +265,13 @@ runcmd:
     systemctl enable litestream
     systemctl restart litestream
 
+  # Fail provisioning loudly if core runtime, services, or state are unhealthy
+  - |
+    set -eu
+    node -e 'require("node:sqlite")'
+    systemctl is-active --quiet app caddy litestream fail2ban
+    curl -fsS http://127.0.0.1:3000 >/dev/null
+    test -f /var/lib/app/app.db
+
 power_state:
   mode: reboot

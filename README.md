@@ -46,7 +46,10 @@ Cloudflare's IP ranges, so a **DNS only** record takes the site down (see
 
 **3. Verify:**
 
-Provisioning takes a few minutes and ends with a reboot. Then:
+Provisioning takes a few minutes and ends with a reboot. Before rebooting,
+cloud-init performs a final self-check that verifies `node:sqlite` loads, the
+`app`, `caddy`, `litestream`, and `fail2ban` services are active, the local app
+endpoint responds, and `/var/lib/app/app.db` exists. Then:
 
 ```bash
 curl https://YOUR_DOMAIN
