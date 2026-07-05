@@ -106,8 +106,14 @@ const osId = await p.select({
     )
   ).os
     .filter((os) => os.family === "debian" || os.family === "ubuntu")
-    .toSorted((left, right) => left.name.localeCompare(right.name))
-    .toReversed()
+    .toSorted((left, right) => {
+      const familyOrder = { ubuntu: 0, debian: 1 } as const;
+      const familyComparison =
+        familyOrder[left.family as keyof typeof familyOrder] -
+        familyOrder[right.family as keyof typeof familyOrder];
+
+      return familyComparison || right.name.localeCompare(left.name);
+    })
     .map((os) => ({
       name: os.name,
       value: os.id,
