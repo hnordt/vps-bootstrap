@@ -68,7 +68,8 @@ off-instance ([Database And Backups](#database-and-backups)).
 The cloud-init template targets Debian-based distributions, favoring current Ubuntu LTS releases, and provisions:
 
 - key-only SSH access for a `deploy` user, with a locked root account
-- unattended package upgrades
+- unattended package upgrades without automatic reboots (reboot notices in the
+  login MOTD, logs in `/var/log/unattended-upgrades/`)
 - UFW firewall: SSH rate-limited, HTTP/HTTPS allowed only from
   Cloudflare-proxied IP ranges
 - fail2ban for SSH protection
