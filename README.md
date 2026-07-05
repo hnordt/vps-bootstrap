@@ -27,7 +27,7 @@ npm run vultr
 ```
 
 Answer the prompts: region, plan (a 1 vCPU / 1 GB plan is preselected when
-available), operating system (pick the newest Ubuntu LTS), your domain, your
+available), operating system (favor the newest Ubuntu LTS), your domain, your
 SSH public keys (comma-separated), and your Vultr API key. The script creates
 the instance and prints its Vultr Console URL.
 
