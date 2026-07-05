@@ -212,7 +212,8 @@ runcmd:
 
   # Allow Cloudflare traffic
   - |
-    ranges=$(curl -fsSL https://api.cloudflare.com/client/v4/ips | jq -re '.result.ipv4_cidrs[], .result.ipv6_cidrs[]')
+    curl -fsSL -o /run/cloudflare-ips.json https://api.cloudflare.com/client/v4/ips
+    ranges=$(jq -re '.result.ipv4_cidrs[], .result.ipv6_cidrs[]' /run/cloudflare-ips.json)
     for range in $ranges; do
       ufw allow proto tcp from "$range" to any port 80,443
     done

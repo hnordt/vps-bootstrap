@@ -322,9 +322,10 @@ During provisioning, cloud-init fetches Cloudflare's current IPv4 and IPv6
 ranges from `https://api.cloudflare.com/client/v4/ips`, then creates UFW allow
 rules for `80/tcp` and `443/tcp` from those ranges only. Direct origin
 HTTP/HTTPS requests from non-Cloudflare IP addresses are blocked by UFW. The
-`jq -e` flag is load-bearing: it makes the pipeline fail when the fetch
-returns nothing, so a transient Cloudflare API failure aborts provisioning
-instead of silently leaving 80/443 blocked.
+fetch is deliberately split from the parse so failures abort provisioning
+instead of silently leaving 80/443 blocked: a failed download stops the script
+under `set -e`, and the `jq -e` flag fails the parse when the response
+contains no ranges.
 
 Because Caddy obtains public certificates through ACME HTTP-01, keep the DNS
 record **Proxied** at all times: Caddy renews certificates automatically in the
