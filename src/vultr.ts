@@ -51,10 +51,7 @@ const regionId = await p.select({
           ),
         }),
       ),
-      {
-        text: "Loading regions",
-        color: "red",
-      },
+      "Loading regions",
     )
   ).regions
     .map((region) => ({
@@ -108,7 +105,7 @@ const osId = await p.select({
       "Loading operating systems",
     )
   ).os
-    .filter((os) => os.family === "ubuntu" || os.family === "debian")
+    .filter((os) => os.family === "debian" || os.family === "ubuntu")
     .toSorted((left, right) => left.name.localeCompare(right.name))
     .toReversed()
     .map((os) => ({
