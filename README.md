@@ -73,7 +73,7 @@ The cloud-init template targets Debian-based distributions, favoring current Ubu
   Cloudflare-proxied IP ranges
 - fail2ban for SSH protection, with Python systemd bindings installed so
   the `systemd` backend is available without relying on package recommends
-- Node.js from the Ubuntu package repositories
+- Node.js 22.x from the NodeSource APT repository
 - a sample Node.js visit-counter app bound to `127.0.0.1:3000`, backed by
   the built-in `node:sqlite` module when available
 - a root-owned app environment file at `/etc/app/.env`
@@ -240,7 +240,7 @@ your deployment target supports one.
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
 module, so no npm dependencies are needed. Cloud-init installs Node.js 22.x
-from the NodeSource repository before starting the app because Debian's distro
+from the NodeSource repository before starting the app because Ubuntu's distro
 `nodejs` package may be too old to provide `node:sqlite`. If `node:sqlite` is
 unavailable, the server fails during startup instead of serving traffic with
 non-persistent state.
