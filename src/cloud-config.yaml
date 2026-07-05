@@ -241,8 +241,7 @@ runcmd:
     curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
     apt-get install -y /run/litestream.deb
     install -m 0600 /run/litestream.yml /etc/litestream.yml
-    systemctl enable litestream
-    systemctl restart litestream
+    systemctl enable --now litestream
 
 power_state:
   mode: reboot
