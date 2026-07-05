@@ -264,6 +264,17 @@ protects against application-level damage, like a bad migration, corruption,
 or an accidental delete, but not against losing the disk or the instance. For
 real disaster recovery, switch the replica to off-instance storage.
 
+The app service attempts a safe restore before every start with
+`litestream restore -if-db-not-exists -if-replica-exists /var/lib/app/app.db`
+and then reapplies `app:app` ownership to `/var/lib/app`. The restore command
+therefore leaves an existing local database untouched, does not fail the boot
+when the configured replica has no backup yet, and can seed a missing database
+from a replica before Node.js opens it. Any other restore failure — an
+unreachable replica, bad credentials, or stale `app.db-*` files left next to a
+missing database — fails the start, and systemd retries every five seconds, so
+a broken replica surfaces as a failed unit rather than as a fresh empty
+database silently replicated over the real backup.
+
 To switch to an S3-compatible bucket (AWS S3, Cloudflare R2, Backblaze B2,
 MinIO), edit the config as root:
 

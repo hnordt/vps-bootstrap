@@ -140,6 +140,8 @@ write_files:
       StateDirectory=app
       StateDirectoryMode=0700
       EnvironmentFile=-/etc/app/.env
+      ExecStartPre=+/usr/bin/litestream restore -if-db-not-exists -if-replica-exists /var/lib/app/app.db
+      ExecStartPre=+/usr/bin/chown -R app:app /var/lib/app
       ExecStart=/usr/bin/node /opt/app/server.mjs
       Restart=always
       RestartSec=5
@@ -215,6 +217,14 @@ runcmd:
     apt-get update
     apt-get install -y nodejs
 
+  # Set up Litestream
+  - |
+    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.13/litestream-0.5.13-linux-x86_64.deb
+    apt-get install -y /run/litestream.deb
+    install -m 0600 /run/litestream.yml /etc/litestream.yml
+    systemctl enable litestream
+    systemctl restart litestream
+
   # Set up the app service
   - |
     systemctl daemon-reload
@@ -229,14 +239,6 @@ runcmd:
     install -m 0644 /run/Caddyfile /etc/caddy/Caddyfile
     caddy validate --config /etc/caddy/Caddyfile
     systemctl restart caddy
-
-  # Set up Litestream
-  - |
-    curl -fsSL -o /run/litestream.deb https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.deb
-    apt-get install -y /run/litestream.deb
-    install -m 0600 /run/litestream.yml /etc/litestream.yml
-    systemctl enable litestream
-    systemctl restart litestream
 
 power_state:
   mode: reboot
