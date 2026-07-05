@@ -240,10 +240,10 @@ your deployment target supports one.
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
 module, so no npm dependencies are needed. Cloud-init installs Node.js 22.x
-from the NodeSource repository before starting the app because Ubuntu's distro
-`nodejs` package may be too old to provide `node:sqlite`. If `node:sqlite` is
-unavailable, the server fails during startup instead of serving traffic with
-non-persistent state.
+from the NodeSource repository before starting the app because Ubuntu and Debian
+distro `nodejs` packages may be too old to provide `node:sqlite`. If
+`node:sqlite` is unavailable, the server fails during startup instead of serving
+traffic with non-persistent state.
 
 When SQLite is available, the database lives at `/var/lib/app/app.db`. The
 `app` service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
