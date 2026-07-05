@@ -338,9 +338,9 @@ redirect or WAF rule interferes with the HTTP-01 challenge path.
 If you stay **Proxied** and want to remove the ACME reachability dependency
 entirely, use a Cloudflare origin certificate or configure Caddy for DNS-01
 validation. If you want a **DNS only** record instead, you must also open ports
-80 and 443 to all sources in UFW — the Cloudflare-only rules block every
-visitor, not just Let's Encrypt — after which standard certificate issuance
-works directly. Note that Cloudflare origin certificates only work behind the
+80 and 443 to all sources in UFW. Otherwise, the Cloudflare-only rules block
+every visitor, not just Let's Encrypt. Standard certificate issuance then works
+directly. Note that Cloudflare origin certificates only work behind the
 proxy; browsers do not trust them on direct connections.
 
 The VPS does not automatically refresh Cloudflare IP ranges after provisioning.
