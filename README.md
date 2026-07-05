@@ -142,10 +142,12 @@ your deployment target supports one.
 ## Database And Backups
 
 The sample app opens a SQLite database with Node.js's built-in `node:sqlite`
-module, so no npm dependencies are needed. On runtimes that do not provide
-`node:sqlite`, the server logs a warning and falls back to an in-memory visit
-counter instead of crashing. That fallback is not persisted or replicated by
-Litestream.
+module, so no npm dependencies are needed. Cloud-init installs Node.js 22.x
+from the NodeSource repository before starting the app because Debian's distro
+`nodejs` package may be too old to provide `node:sqlite`. On runtimes that do
+not provide `node:sqlite`, the server logs a warning and falls back to an
+in-memory visit counter instead of crashing. That fallback is not persisted or
+replicated by Litestream.
 
 When SQLite is available, the database lives at `/var/lib/app/app.db`. The
 `app` service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
