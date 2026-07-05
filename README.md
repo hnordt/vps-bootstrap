@@ -244,8 +244,8 @@ distro `nodejs` packages may be too old to provide `node:sqlite`. If
 `node:sqlite` is unavailable, the server fails during startup instead of serving
 traffic with non-persistent state.
 
-The database lives at `/var/lib/app/app.db`. The
-`app` service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
+The sample app stores its SQLite database at `/var/lib/app/app.db`. The `app`
+service uses `StateDirectory=app`, so systemd creates `/var/lib/app`
 owned by the `app` user, and it is the only path the hardened service can write
 to. The directory is created with `0700` permissions
 (`StateDirectoryMode=0700`) and the service runs with `UMask=0077`, so the
