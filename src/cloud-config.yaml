@@ -222,9 +222,7 @@ runcmd:
     apt-get install -y nodejs
 
   # Set up the app service
-  - |
-    systemctl daemon-reload
-    systemctl enable --now app
+  - systemctl enable --now app
 
   # Set up Caddy
   - |
