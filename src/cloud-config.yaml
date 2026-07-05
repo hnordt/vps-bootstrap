@@ -269,9 +269,13 @@ runcmd:
   - |
     set -eu
     node -e 'require("node:sqlite")'
-    systemctl is-active --quiet app caddy litestream fail2ban
+    for service in app caddy litestream fail2ban; do
+      systemctl is-active --quiet "$service"
+    done
     curl -fsS http://127.0.0.1:3000 >/dev/null
     test -f /var/lib/app/app.db
+    touch /run/provisioning-self-check-ok
 
 power_state:
   mode: reboot
+  condition: test -f /run/provisioning-self-check-ok

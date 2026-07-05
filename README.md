@@ -49,7 +49,9 @@ Cloudflare's IP ranges, so a **DNS only** record takes the site down (see
 Provisioning takes a few minutes and ends with a reboot. Before rebooting,
 cloud-init performs a final self-check that verifies `node:sqlite` loads, the
 `app`, `caddy`, `litestream`, and `fail2ban` services are active, the local app
-endpoint responds, and `/var/lib/app/app.db` exists. Then:
+endpoint responds, and `/var/lib/app/app.db` exists. The reboot is gated on that
+self-check succeeding, so a failed check leaves cloud-init in a failed state without
+performing the final reboot. Then:
 
 ```bash
 curl https://YOUR_DOMAIN
